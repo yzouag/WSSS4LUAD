@@ -1,11 +1,13 @@
 import os
 import numpy as np
-from PIL import Image, ImagePalette
+from PIL import Image
 from patchify import patchify
 import argparse
 from tqdm import tqdm
+from multiprocessing import Pool
 
-def cropImage(imfile, c, count, threshold = 0.5):
+def cropImage(file_info):
+    imfile, c, count, threshold = file_info
     full_path = './Dataset/1.training/' + imfile
     im = Image.open(full_path)
     im_arr = np.asarray(im)
@@ -37,7 +39,6 @@ def checkProportion(im_arr, threshold = 0.5):
     return False
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False, help="The threshold to use to eliminate images with white proportions")
     args = parser.parse_args()
@@ -48,11 +49,19 @@ if __name__ == "__main__":
         os.mkdir("./train_single_patches")
 
     single_dict = {"[1, 0, 0]": 0, "[0, 1, 0]": 1, "[0, 0, 1]": 2}
+    
+    p = Pool(processes=6)
+
+    # make file name list for multiprocessing
+    file_list = []
     count = 0
-    for file in tqdm(os.listdir('./Dataset/1.training')):
+    for file in os.listdir('./Dataset/1.training'):
         category = file.split('.')[0][-9:]
         if category in single_dict:
             count += 1
             c = single_dict[category]
-            cropImage(file, c, count, threshold)
+            file_list.append((file, c, count, threshold))
+
+    p.map(cropImage, file_list)
+
 
