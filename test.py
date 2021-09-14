@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import os
 import cv2
 from itertools import permutations
+import png
 
 def get_mask(mask_image):
     background_im = np.reshape(mask_image, (-1,3))
@@ -63,8 +64,8 @@ def get_prediction(original_image, clusters, method='kmeans', heatmap=None, smoo
     white = 2.7
     window_size = 3
     gaussian_k = (3,3)
-    pow = 2
-    threshold = 1e-2
+    pow = 5
+    threshold = 5e-5
     weight = 1
 
     h, w, _ = original_image.shape
@@ -171,11 +172,14 @@ def set_color(prediction, match):
                 prediction_image[x,y] = color[BACKGROUND]
             elif prediction[x, y] == NORMAL:
                 prediction_image[x,y] = color[match[NORMAL]]
+                prediction[x,y] = match[NORMAL]
             elif prediction[x, y] == TUMOR:
                 prediction_image[x,y] = color[match[TUMOR]]
+                prediction[x,y] = match[TUMOR]
             else:
                 prediction_image[x,y] = color[match[STROMA]]
-    return prediction_image
+                prediction[x,y] = match[STROMA]
+    return prediction_image.astype(np.int32), prediction.astype(np.int8)
 
 TUMOR = 0
 STROMA = 1
@@ -218,8 +222,13 @@ if __name__ == "__main__":
         
         mIOU, match = get_mIOU(mask, groundtruth, prediction)
 
-        prediction_image = set_color(prediction, match).astype(np.int32)
+        prediction_image, prediction = set_color(prediction, match)
 
+        palette=[(0, 64, 128), (64, 128, 0), (243, 152, 0), (255,255,255)]
+        with open(f'result/{i:02d}.png', 'wb') as f:
+            w = png.Writer(prediction.shape[1], prediction.shape[0], palette=palette, bitdepth=8)
+            w.write(f, prediction)
+        
         with open(f'res_{method}{with_cam}/result.log', 'a') as f:
             f.write(f'image{i}, mIOU={mIOU}\n')
         
