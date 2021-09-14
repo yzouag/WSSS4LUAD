@@ -1,3 +1,4 @@
 *.zip
 Dataset/
 train_single_patches/
+__pycache__
