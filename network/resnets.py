@@ -1,7 +1,9 @@
 import torch.nn as nn 
 import torch 
-import sys 
+import sys
 import numpy as np
+import torchvision.models as models
+ 
 
 class Normalize():
     def __init__(self, mean = (0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225)):
@@ -93,14 +95,14 @@ class Bottleneck(nn.Module):
         return out 
  
  
-def init_weight(module): 
-    nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu') 
+# def init_weight(module): 
+#     nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu') 
  
  
 class ResNet(nn.Module): 
  
     def __init__(self, block=Bottleneck, layers=[3, 4, 23, 3], base_channels=64): 
-        self.inplanes = base_channels 
+        self.inplanes = base_channels
         super(ResNet, self).__init__() 
         self.conv1 = nn.Conv2d(3, base_channels, 7, 2, 3, bias=False) 
         #self.conv1 = nn.Conv2d(3, base_channels, 3, 2, 1, bias=False) 
@@ -112,17 +114,20 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, base_channels * 4, layers[2], dilation=2) 
         self.layer4 = self._make_layer(block, base_channels * 8, layers[3], dilation=4) 
  
-        for m in self.modules(): 
-            if isinstance(m, nn.Conv2d): 
-                init_weight(m) 
-            elif isinstance(m, nn.BatchNorm2d): 
-                nn.init.constant_(m.weight, 1) 
-                nn.init.constant_(m.bias, 0) 
+        # for m in self.modules(): 
+        #     if isinstance(m, nn.Conv2d): 
+        #         init_weight(m) 
+        #     elif isinstance(m, nn.BatchNorm2d): 
+        #         nn.init.constant_(m.weight, 1) 
+        #         nn.init.constant_(m.bias, 0) 
 
         self.normalize = Normalize()
         self.not_training = []
 
  
+    def init_weight():
+        resnet101 = models.resnet101(pretrained=True)
+
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1): 
         layers = [] 
         downsample = stride != 1 or self.inplanes != planes * block.expansion 
