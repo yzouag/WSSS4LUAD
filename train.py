@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
 import torch
 import network
 import dataset
@@ -27,7 +27,7 @@ parser.add_argument("--batch", default=50, type=int)
 args = parser.parse_args()
 
 batch_size = args.batch
-base_lr = 0.001
+base_lr = 0.0003
 net = network.ResNet().cuda()
 
 # Get pretrained model
@@ -45,7 +45,7 @@ model_dict.update(pretrained_dict)
 # Load pretraiend parameters
 net.load_state_dict(model_dict)
 
-net.cuda()
+net = torch.nn.DataParallel(net, device_ids=[0, 1, 2]).cuda()
 net.train()
 
 Dataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
@@ -60,19 +60,20 @@ print("Dataset", len(Dataset))
 Datasampler = torch.utils.data.RandomSampler(Dataset)
 Dataloader = DataLoader(Dataset, batch_size=batch_size, num_workers=2, sampler=Datasampler, drop_last=True)
 optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.2)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 criteria.cuda()
 
-epochs = 30
+epochs = 10
 loss_g = []
 accuracy_g = []
 
-for i in trange(epochs):
+for i in range(epochs):
     running_loss = 0.
     count = 0
     correct = 0
 
-    for img, label in Dataloader:
+    for img, label in tqdm(Dataloader):
         count += 1
         img = img.cuda()
         onehot_label = convertinttoonehot(label).cuda()
@@ -84,13 +85,14 @@ for i in trange(epochs):
         label = label.cuda()
         b = level == label
         correct += torch.sum(b).item()
-        print("level: ", torch.sum(b).item())
+        # print("level: ", torch.sum(b).item())
         optimizer.zero_grad()
         loss.backward()
 
         optimizer.step()
         running_loss += loss.item()
 
+    scheduler.step()
     print("loss: ", running_loss / count)
     print("accuracy: ", correct / (count * batch_size))
     accuracy_g.append(correct / (count * batch_size))
