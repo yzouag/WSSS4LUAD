@@ -120,7 +120,9 @@ class ResNet(nn.Module):
         #     elif isinstance(m, nn.BatchNorm2d): 
         #         nn.init.constant_(m.weight, 1) 
         #         nn.init.constant_(m.bias, 0) 
-
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Linear(2048, 128)
+        self.fc2 = nn.Linear(128, 3)
         self.normalize = Normalize()
         self.not_training = []
 
@@ -149,7 +151,13 @@ class ResNet(nn.Module):
         x3 = self.layer3(x2) 
         x4 = self.layer4(x3) 
 
-        return dict({'x2': x2, 'x3': x3, 'x4': x4})
+        result = self.pool(x4)
+        result = torch.flatten(result, start_dim=1)
+        result = self.fc1(result)
+        result = self.fc2(result)
+
+        # return dict({'x2': x2, 'x3': x3, 'x4': x4})
+        return result
 
     def train(self, mode=True):
 
