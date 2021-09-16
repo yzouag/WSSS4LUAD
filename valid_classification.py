@@ -13,14 +13,6 @@ import torchvision.models as models
 import matplotlib.pyplot as plt
 import argparse
 
-# def convertinttoonehot(nums_list):
-#     dic = {0: [1, 0, 0], 1: [0, 1, 0], 2: [0, 0, 1]}
-#     result = np.empty((len(nums_list), 3))
-#     for i in range(len(nums_list)):
-#         result[i] = np.array(dic[nums_list[i].item()])
-
-#     return torch.tensor(result, requires_grad=False)
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=50, type=int)
 args = parser.parse_args()
@@ -36,7 +28,9 @@ net.cuda()
 net.eval()
 
 validDataset = dataset.SingleLabelDataset("valid_single_patches/", transform=transforms.Compose([
-    transforms.Resize(224),
+    transforms.Resize(256),
+    transforms.RandomCrop(224),
+    # transforms.Resize(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 

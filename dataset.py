@@ -22,45 +22,26 @@ class SingleLabelDataset(Dataset):
         label = int(self.files[idx][-5:-4])
         return im, label
 
-# class SingleLabelValidationDataset(Dataset):
-#     def __init__(self, data_path_name, transform=None):
-#         self.path = data_path_name
-#         self.files = os.listdir(data_path_name)
-#         self.transform = transform
+class OnlineDataset(Dataset):
+    def __init__(self, data_path_name, transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(data_path_name)
+        self.transform = transform
 
-#     def __len__(self):
-#         return len(self.files)
+    def __len__(self):
+        return len(self.files)
 
-#     def __getitem__(self, idx):
-#         image_path = os.path.join(self.path, self.files[idx])
-#         im = Image.open(image_path)
-#         # im = im / 255 # convert to 0-1 scale
-#         if self.transform:
-#             im = self.transform(im)
-#         label = int(self.files[idx][-5:-4])
-#         return im, label
-# we don't need self-designed transform functions
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+        im_list, position_list = onlinecutpatches(im)
+        if self.transform:
+            for patch_id in range(len(im_list)):
+                im_list[patch_id] = self.transform(im_list[patch_id])
+        # label = int(self.files[idx][-5:-4])
+        # position = tuple(int(self.files[idx][-7]), int(self.files[idx][-8]))
+        return image_path, im_list, position_list
 
-# class RandomFlip(object):
-#     """
-#     flip the image in given dimension
-#     """
-
-#     def __call__(self, im):
-#         if np.random.rand() < 0.5:
-#             axis = np.random.randint(0, 2)
-#             axis += 1
-#             im = np.flip(im, axis=axis).copy()
-
-#         return im
-
-# class RandomRot(object):
-#     """
-#     Rotate the image in given dimension
-#     """
-
-#     def __call__(self, im):
-#         if np.random.rand() < 0.5:
-#             im = np.rot90(im, 1, axes=(2, 3))
-
-#         return im
+# Todo: define the onlinecutpatches function
+def onlinecutpatches(im):
+    return

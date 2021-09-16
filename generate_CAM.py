@@ -1,0 +1,74 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+import torch
+import network
+import dataset
+from torch.utils.data import DataLoader
+import numpy as np
+import torch.nn.functional as F
+from torchvision import transforms
+from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
+import argparse
+from PIL import Image
+
+side_length = 56
+out_cam = "./out_cam"
+net = network.ResNetCAM()
+path = "./model_last.pth"
+pretrained = torch.load(path)['model']
+# pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
+# pretrained_modify['fc1.weight'] = pretrained_modify['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
+# pretrained_modify['fc2.weight'] = pretrained_modify['fc2.weight'].unsqueeze(-1).unsqueeze(-1)
+pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
+pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1)
+
+net.load_state_dict(pretrained)
+print(f'Model loaded from {path} Successfully')
+# torch.save({"model": net.state_dict()}, "./model_last.pth")
+net.cuda()
+net.eval()
+
+
+onlineDataset = dataset.OnlineDataset("/", transform=transforms.Compose([
+    transforms.Resize(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+
+print("Dataset", len(onlineDataset))
+onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
+
+for im_path, im_list, position_list in tqdm(onlineDataloader):
+    orig_img = np.asarray(Image.open(im_path[0]))
+    position_list = position_list[0]
+    def tocamlist(im):
+        # create batch with size 1
+        im = im.unsqueeze(0)
+        im = im.cuda()
+        cam_scores = net(im)
+        # expected shape is batch_size * channel * h * w
+        cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0]
+        return cam_scores
+    cam_list = map(tocamlist, im_list[0])
+    # add Tonumpy
+
+    # merge crops
+    sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
+    sum_counter = np.zeros_like(sum_cam)
+    for i in range(len(cam_list)):
+        x, y = position_list[i]
+        crop = cam_list[i]
+        sum_cam[:, y:y+side_length, x:x+side_length] += crop
+        sum_counter[:, y:y+side_length, x:x+side_length] += 1
+    sum_counter[sum_counter < 1] = 1
+
+    sum_cam = sum_cam / sum_counter
+    cam_max = np.max(sum_cam, (1,2), keepdims=True)
+    cam_min = np.min(sum_cam, (1,2), keepdims=True)
+    sum_cam[sum_cam < cam_min+1e-5] = 0
+    norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
+
+    if out_cam is not None:
+        if not os.path.exists(out_cam):
+            os.makedirs(out_cam)
+        np.save(os.path.join(out_cam, im_path.split('/')[-1].split('.')[0] + '.npy'), norm_cam)
