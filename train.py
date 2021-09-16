@@ -48,7 +48,7 @@ net.load_state_dict(model_dict)
 net = torch.nn.DataParallel(net, device_ids=[0, 1, 2]).cuda()
 net.train()
 
-Dataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
+TrainDataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
     transforms.Resize(256),
     transforms.RandomCrop(224),
     transforms.RandomHorizontalFlip(),
@@ -56,15 +56,15 @@ Dataset = dataset.SingleLabelDataset("train_single_patches/", transform=transfor
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
-print("Dataset", len(Dataset))
-Datasampler = torch.utils.data.RandomSampler(Dataset)
-Dataloader = DataLoader(Dataset, batch_size=batch_size, num_workers=2, sampler=Datasampler, drop_last=True)
+print("Dataset", len(TrainDataset))
+TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
+TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.2)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 criteria.cuda()
 
-epochs = 10
+epochs = 30
 loss_g = []
 accuracy_g = []
 
@@ -73,7 +73,7 @@ for i in range(epochs):
     count = 0
     correct = 0
 
-    for img, label in tqdm(Dataloader):
+    for img, label in tqdm(TrainDataloader):
         count += 1
         img = img.cuda()
         onehot_label = convertinttoonehot(label).cuda()
@@ -97,13 +97,15 @@ for i in range(epochs):
     print("accuracy: ", correct / (count * batch_size))
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
+    if (i + 1) % 5 == 0:
+        torch.save(net.state_dict(), "./model_ep"+str(i+1)+".pth")
 
 fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
 plt.savefig('loss.png')
-torch.save(net.state_dict(), "./model.pth")
+torch.save(net.state_dict(), "./model_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)

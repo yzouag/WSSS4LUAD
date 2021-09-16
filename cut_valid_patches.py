@@ -8,7 +8,7 @@ from collections import Counter
 
 def crop_image(origin_im, mask_im, count, threshold):
     stack_image = np.concatenate((origin_im, mask_im.reshape(mask_im.shape[0], mask_im.shape[1],1)),axis=2)
-    patches = patchify(stack_image, (56,56,4), step=28)
+    patches = patchify(stack_image, (56,56,4), step=56)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i,j,0,:,:,:3]
@@ -43,9 +43,9 @@ if __name__ == "__main__":
     
     count = 0
     for image in tqdm(image_names):
+        count += 1
         origin_image_path = os.path.join(valid_origin_path, image)
         mask_image_path = os.path.join(valid_mask_path, image)
         origin_im = np.asarray(Image.open(origin_image_path))
         mask_im = np.asarray(Image.open(mask_image_path))
         crop_image(origin_im, mask_im, count, threshold)
-        count += 1

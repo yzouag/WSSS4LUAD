@@ -22,7 +22,23 @@ class SingleLabelDataset(Dataset):
         label = int(self.files[idx][-5:-4])
         return im, label
 
+# class SingleLabelValidationDataset(Dataset):
+#     def __init__(self, data_path_name, transform=None):
+#         self.path = data_path_name
+#         self.files = os.listdir(data_path_name)
+#         self.transform = transform
 
+#     def __len__(self):
+#         return len(self.files)
+
+#     def __getitem__(self, idx):
+#         image_path = os.path.join(self.path, self.files[idx])
+#         im = Image.open(image_path)
+#         # im = im / 255 # convert to 0-1 scale
+#         if self.transform:
+#             im = self.transform(im)
+#         label = int(self.files[idx][-5:-4])
+#         return im, label
 # we don't need self-designed transform functions
 
 # class RandomFlip(object):
