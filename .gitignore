@@ -6,3 +6,4 @@ __pycache__
 network/__pycache__/
 *.pth
 real_test.py
+modelstates/

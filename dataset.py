@@ -62,15 +62,15 @@ def online_cut_patches(im, im_size=56, stride=28):
 
     h, w, _ = im.shape
 
-    h_ = np.arange(0, h-stride, stride)
+    h_ = np.arange(0, h - im_size + 1, stride)
     if h % stride != 0:
         h_ = np.append(h_, h-im_size)
-    w_ = np.arange(0, w, stride)
+    w_ = np.arange(0, w - im_size + 1, stride)
     if w % stride != 0:
-        w_ = np.append(w_, w-im_size)
+        w_ = np.append(w_, w - im_size)
 
     for i in h_:
         for j in w_:
-            im_list.append(im[i:i+im_size,j:j+im_size])
+            im_list.append(im[i:i+im_size,j:j+im_size,:].copy())
             position_list.append((i,j))
     return im_list, position_list

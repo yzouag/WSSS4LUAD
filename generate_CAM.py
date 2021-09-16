@@ -47,10 +47,9 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
         im = im.cuda()
         cam_scores = net(im)
         # expected shape is batch_size * channel * h * w
-        cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0]
+        cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].numpy()
         return cam_scores
     cam_list = map(tocamlist, im_list[0])
-    # add Tonumpy
 
     # merge crops
     sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
