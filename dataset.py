@@ -70,7 +70,8 @@ def online_cut_patches(im, im_size=56, stride=28):
         w_ = np.append(w_, w - im_size)
 
     for i in h_:
-        for j in w_:
-            im_list.append(im[i:i+im_size,j:j+im_size,:].copy())
+        for j in w_:   	
+            temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
+            im_list.append(temp)
             position_list.append((i,j))
     return im_list, position_list

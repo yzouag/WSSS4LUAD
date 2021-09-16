@@ -109,8 +109,8 @@ class ResNetCAM(nn.Module):
         self.layer3 = self._make_layer(block, base_channels * 4, layers[2], dilation=2) 
         self.layer4 = self._make_layer(block, base_channels * 8, layers[3], dilation=4) 
  
-        self.fc1 = torch.nn.Conv2d(2048, 128, 1, stride=1, padding=0, dilation = 0, bias=True)
-        self.fc2 = torch.nn.Conv2d(128, 3, 1, stride=1, padding=0, dilation = 0, bias=True)
+        self.fc1 = torch.nn.Conv2d(2048, 128, 1, stride=1, padding=0, bias=True)
+        self.fc2 = torch.nn.Conv2d(128, 3, 1, stride=1, padding=0, bias=True)
         self.normalize = Normalize()
         self.not_training = []
 
@@ -138,6 +138,7 @@ class ResNetCAM(nn.Module):
         x2 = self.layer2(x) 
         x3 = self.layer3(x2) 
         x4 = self.layer4(x3) 
+        # print(x4.type())
 
         result = self.fc1(x4)
         result = self.fc2(result)
