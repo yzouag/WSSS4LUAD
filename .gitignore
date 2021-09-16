@@ -1,7 +1,8 @@
 *.zip
 Dataset/
 train_single_patches/
+valid_single_patches/
 __pycache__
 network/__pycache__/
-valid_single_patches/
 *.pth
+real_test.py
