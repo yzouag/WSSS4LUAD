@@ -34,8 +34,8 @@ class OnlineDataset(Dataset):
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
-        im = Image.open(image_path)
-        im_list, position_list = onlinecutpatches(im)
+        im = np.asarray(Image.open(image_path))
+        im_list, position_list = online_cut_patches(im)
         if self.transform:
             for patch_id in range(len(im_list)):
                 im_list[patch_id] = self.transform(im_list[patch_id])
@@ -44,7 +44,7 @@ class OnlineDataset(Dataset):
         return image_path, im_list, position_list
 
 
-def onlinecutpatches(im, im_size=56, stride=28):
+def online_cut_patches(im, im_size=56, stride=28):
     """
     function for crop the image to subpatches, will include corner cases
     the return position (x,y) is the up left corner of the image
