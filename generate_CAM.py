@@ -15,13 +15,14 @@ from PIL import Image
 side_length = 56
 out_cam = "./out_cam"
 net = network.ResNetCAM()
-path = "./model_last.pth"
+path = "./modelstates/model_last.pth"
 pretrained = torch.load(path)['model']
 # pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
 # pretrained_modify['fc1.weight'] = pretrained_modify['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
 # pretrained_modify['fc2.weight'] = pretrained_modify['fc2.weight'].unsqueeze(-1).unsqueeze(-1)
-pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
-pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1)
+pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+# print(pretrained['fc2.bias'].type())
 
 net.load_state_dict(pretrained)
 print(f'Model loaded from {path} Successfully')
@@ -30,7 +31,7 @@ net.cuda()
 net.eval()
 
 
-onlineDataset = dataset.OnlineDataset("/", transform=transforms.Compose([
+onlineDataset = dataset.OnlineDataset("./Dataset/2.validation/img", transform=transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
@@ -40,22 +41,25 @@ onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
 for im_path, im_list, position_list in tqdm(onlineDataloader):
     orig_img = np.asarray(Image.open(im_path[0]))
-    position_list = position_list[0]
+    # print(position_list)
+    # print(im_path)
+    # exit()
+    # position_list = position_list[0]
     def tocamlist(im):
         # create batch with size 1
         im = im.unsqueeze(0)
         im = im.cuda()
         cam_scores = net(im)
         # expected shape is batch_size * channel * h * w
-        cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].numpy()
+        cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
         return cam_scores
-    cam_list = map(tocamlist, im_list[0])
+    cam_list = list(map(tocamlist, im_list[0]))
 
     # merge crops
     sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
     sum_counter = np.zeros_like(sum_cam)
     for i in range(len(cam_list)):
-        x, y = position_list[i]
+        y, x = position_list[i][0].item(), position_list[i][1].item()
         crop = cam_list[i]
         sum_cam[:, y:y+side_length, x:x+side_length] += crop
         sum_counter[:, y:y+side_length, x:x+side_length] += 1
@@ -70,4 +74,4 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
     if out_cam is not None:
         if not os.path.exists(out_cam):
             os.makedirs(out_cam)
-        np.save(os.path.join(out_cam, im_path.split('/')[-1].split('.')[0] + '.npy'), norm_cam)
+        np.save(os.path.join(out_cam, im_path[0].split('/')[-1].split('.')[0] + '.npy'), norm_cam)
