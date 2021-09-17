@@ -16,6 +16,7 @@ for i in range(len(image_names)):
     heatmap_img = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
 
     fin = cv2.addWeighted(heatmap_img, 0.7, im, 0.3, 0)
-    cv2.imshow('result.png',fin)
-    cv2.waitKey(0)
+    # cv2.imshow('result.png',fin)
+    cv2.imwrite('result.png',fin)
+    # cv2.waitKey(0)
     break

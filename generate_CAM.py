@@ -41,26 +41,31 @@ onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
 for im_path, im_list, position_list in tqdm(onlineDataloader):
     orig_img = np.asarray(Image.open(im_path[0]))
-    # print(position_list)
-    # print(im_path)
+    # print(len(im_list))
+    # print(position_list[3][0], position_list[3][1])
     # exit()
     # position_list = position_list[0]
     def tocamlist(im):
-        # create batch with size 1
-        im = im.unsqueeze(0)
+        # im = im.unsqueeze(0)
+        # print(im.shape)
         im = im.cuda()
         cam_scores = net(im)
         # expected shape is batch_size * channel * h * w
         cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
         return cam_scores
-    cam_list = list(map(tocamlist, im_list[0]))
+
+    # numofimgs, channels, length, lengths
+    cam_list = list(map(tocamlist, im_list))
+    # print(len(cam_list))
 
     # merge crops
     sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
     sum_counter = np.zeros_like(sum_cam)
     for i in range(len(cam_list)):
-        y, x = position_list[i][0].item(), position_list[i][1].item()
+        y, x = position_list[i][0], position_list[i][1]
         crop = cam_list[i]
+        # print("i is :",i)
+        print(f"y: {y}, x: {x}")
         sum_cam[:, y:y+side_length, x:x+side_length] += crop
         sum_counter[:, y:y+side_length, x:x+side_length] += 1
     sum_counter[sum_counter < 1] = 1
