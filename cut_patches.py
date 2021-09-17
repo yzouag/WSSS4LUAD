@@ -3,12 +3,12 @@ import numpy as np
 from PIL import Image
 from patchify import patchify
 import argparse
-from tqdm import tqdm
 from multiprocessing import Pool
 import shutil
 
 def cropImage(file_info):
     imfile, c, count, threshold = file_info
+    print(imfile)
     full_path = './Dataset/1.training/' + imfile
     im = Image.open(full_path)
     im_arr = np.asarray(im)
