@@ -28,3 +28,4 @@ for i in range(len(image_names)):
     plt.imshow(cv2.cvtColor(im, cv2.COLOR_BGR2RGB))
     plt.title('original image')
     plt.savefig(f'heatmap/{i:02d}.png')
+    plt.close()
