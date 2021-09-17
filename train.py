@@ -25,13 +25,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=50, type=int)
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True)
 parser.add_argument('-setting', type=str, help='the stride and pathsize setting', required=True)
-parser.add_argument("-ce", action='store_true', help='whether to use ce loss')
+parser.add_argument("-bce", action='store_true', help='whether to use bce loss')
 args = parser.parse_args()
 
 batch_size = args.batch
 devices = args.d
 setting_str = args.setting
-use_ce = args.ce
+use_bce = args.bce
 base_lr = 0.0003
 net = network.ResNet().cuda()
 assert os.path.exists("./train_single_patches"), "The directory train_single_patches haven't been genereated!"
@@ -61,7 +61,7 @@ TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
-if use_ce:
+if not use_bce:
     criteria = torch.nn.CrossEntropyLoss(reduction='mean')
 else:
     criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
@@ -82,7 +82,7 @@ for i in range(epochs):
         img = img.cuda()
         
         scores = net(img)
-        if use_ce:
+        if not use_bce:
             label = label.cuda()
             loss = criteria(scores, label)
         else:

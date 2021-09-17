@@ -16,11 +16,13 @@ import shutil
 parser = argparse.ArgumentParser()
 parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
 parser.add_argument("-side", default=56, type=int, required=False)
+parser.add_argument("-stride", default=28, type=int, required=False)
 parser.add_argument("-m", default="model_last", type=str, required=False, help="model name")
 args = parser.parse_args()
 
 for_validation = args.v
 side_length = args.side
+stride = args.stride
 model_name = args.m
 if for_validation:
     out_cam = "./validation_out_cam"
@@ -54,7 +56,9 @@ net.eval()
 onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
+    patch_size = side_length,
+    stride = stride)
 
 print("Dataset", len(onlineDataset))
 onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)

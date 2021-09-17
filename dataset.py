@@ -24,10 +24,12 @@ class SingleLabelDataset(Dataset):
 
 
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None):
+    def __init__(self, data_path_name, transform=None, patch_size = 56, stride=28):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
+        self.patch_size = patch_size
+        self.stride = stride
 
     def __len__(self):
         return len(self.files)
@@ -35,7 +37,7 @@ class OnlineDataset(Dataset):
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
         im = np.asarray(Image.open(image_path))
-        im_list, position_list = online_cut_patches(im)
+        im_list, position_list = online_cut_patches(im, self.patch_size, self.stride)
         if self.transform:
             for patch_id in range(len(im_list)):
                 im_list[patch_id] = self.transform(im_list[patch_id])
