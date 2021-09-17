@@ -1,15 +1,35 @@
 import os
 import numpy as np
-from PIL import Image, ImagePalette
+from PIL import Image
+import argparse
+import shutil
 
-if not os.path.exists("./test_results"):
-    os.mkdir("./test_results")
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
+args = parser.parse_args()
 
-campath = "./test_out_cam"
-for file in os.listdir("./Dataset/3.testing/background-mask"):
+for_validation = args.v
+if for_validation:
+    out_path = "./validation_results"
+    campath = "./validation_out_cam"
+    background_path = "./Dataset/2.validation/background-mask/"
+    assert os.path.exists(campath), "the cam for validation has not been generated!"
+else:
+    out_path = "./test_results"
+    campath = "./test_out_cam"
+    background_path = "./Dataset/3.testing/background-mask/"
+    assert os.path.exists(campath), "the cam for test has not been generated!"
+
+if not os.path.exists(out_path):
+    os.mkdir(out_path)
+else:
+    shutil.rmtree(out_path)
+    os.mkdir(out_path)
+
+for file in os.listdir(background_path):
     fileindex = file.split('.')[0]
     print(file)
-    mask = Image.open("./Dataset/3.testing/background-mask/"+ file)
+    mask = Image.open(background_path + file)
     mask_array = np.asarray(mask)
     i, j = mask_array.shape
     result_array = np.load(os.path.join(campath, fileindex+".npy"))
@@ -26,4 +46,4 @@ for file in os.listdir("./Dataset/3.testing/background-mask"):
 
 
     result = Image.fromarray(np.uint8(result_array))
-    result.save("./test_results/" + file)
+    result.save(os.path.join(out_path, file))

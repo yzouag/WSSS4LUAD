@@ -12,3 +12,4 @@ test_out_cam/
 testing.ipynb
 heatmap/
 test_results/
+validation_results/

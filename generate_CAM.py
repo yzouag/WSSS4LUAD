@@ -39,7 +39,8 @@ else:
 net = network.ResNetCAM()
 path = "./modelstates/" + model_name + ".pth"
 pretrained = torch.load(path)['model']
-# pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
+# print(pretrained.keys())
+pretrained = {k[7:] : v for k, v in pretrained.items()}
 # pretrained_modify['fc1.weight'] = pretrained_modify['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
 # pretrained_modify['fc2.weight'] = pretrained_modify['fc2.weight'].unsqueeze(-1).unsqueeze(-1)
 pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
