@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+# os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
 import torch
 import network
 import dataset
@@ -11,16 +11,31 @@ from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 import argparse
 from PIL import Image
+import shutil
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-v", default=50, type=int)
+parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
+parser.add_argument("-side", default=56, type=int, required=False)
+parser.add_argument("-m", default="model_last", type=str, required=False, help="model name")
 args = parser.parse_args()
 
-batch_size = args.batch
-side_length = 56
-out_cam = "./test_out_cam"
+for_validation = args.v
+side_length = args.side
+model_name = args.m
+if for_validation:
+    out_cam = "./validation_out_cam"
+    dataset_path = "./Dataset/2.validation/img"
+else:
+    out_cam = "./test_out_cam"
+    dataset_path = "./Dataset/3.testing/img"
+if not os.path.exists(out_cam):
+    os.mkdir(out_cam)
+else:
+    shutil.rmtree(out_cam)
+    os.mkdir(out_cam)
+
 net = network.ResNetCAM()
-path = "./modelstates/model_last.pth"
+path = "./modelstates/" + model_name + ".pth"
 pretrained = torch.load(path)['model']
 # pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
 # pretrained_modify['fc1.weight'] = pretrained_modify['fc1.weight'].unsqueeze(-1).unsqueeze(-1)
@@ -36,7 +51,7 @@ net.cuda()
 net.eval()
 
 
-onlineDataset = dataset.OnlineDataset("./Dataset/3.testing/img", transform=transforms.Compose([
+onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
@@ -46,13 +61,9 @@ onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
 for im_path, im_list, position_list in tqdm(onlineDataloader):
     orig_img = np.asarray(Image.open(im_path[0]))
-    # print(len(im_list))
-    # print(position_list[3][0], position_list[3][1])
-    # exit()
-    # position_list = position_list[0]
+
     def tocamlist(im):
-        # im = im.unsqueeze(0)
-        # print(im.shape)
+        
         im = im.cuda()
         cam_scores = net(im)
         # expected shape is batch_size * channel * h * w
@@ -84,5 +95,5 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
 
     if out_cam is not None:
         if not os.path.exists(out_cam):
-            os.makedirs(out_cam)
+            os.makedir(out_cam)
         np.save(os.path.join(out_cam, im_path[0].split('/')[-1].split('.')[0] + '.npy'), result_label)

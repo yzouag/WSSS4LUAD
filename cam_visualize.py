@@ -3,16 +3,35 @@ import cv2
 import os
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+import shutil
+import argparse
 
-# img_path = 'Dataset/2.validation/img'
-img_path = 'Dataset/3.testing/img'
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
+args = parser.parse_args()
+
+for_validation = args.v
+if for_validation:
+    img_path = 'Dataset/2.validation/img'
+    mask_path = 'Dataset/2.validation/mask'
+    cam_path = './validation_out_cam'
+    heatmap_path = "./validation_heatmap"
+    assert os.path.exists(cam_path), "The cam for validation has not been generated!"
+else:
+    img_path = 'Dataset/3.testing/img'
+    mask_path = 'Dataset/3.testing/mask'
+    cam_path = './test_out_cam'
+    heatmap_path = "./test_heatmap"
+    assert os.path.exists(cam_path), "The cam for testing has not been generated!"
+
 image_names = os.listdir(img_path)
-cam_path = 'test_out_cam'
 npy_names = os.listdir(cam_path)
-mask_path = 'Dataset/2.validation/mask'
 
-if not os.path.exists("./heatmap"):
-    os.mkdir("./heatmap")
+if not os.path.exists(heatmap_path):
+    os.mkdir(heatmap_path)
+else:
+    shutil.rmtree(heatmap_path)
+    os.mkdir(heatmap_path)
 
 for i in tqdm(range(len(image_names))):
     cam = np.load(os.path.join(cam_path, npy_names[i]), allow_pickle=True)
@@ -47,5 +66,5 @@ for i in tqdm(range(len(image_names))):
     plt.subplot(2,2,4)
     plt.imshow(cv2.cvtColor(mask, cv2.COLOR_BGR2RGB))
     plt.title('original image')
-    plt.savefig(f'heatmap/{i:02d}.png')
+    plt.savefig(f'{heatmap_path}/{i:02d}.png')
     plt.close()

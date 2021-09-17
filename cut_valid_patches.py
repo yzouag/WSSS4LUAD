@@ -5,10 +5,11 @@ from patchify import patchify
 import argparse
 from tqdm import tqdm
 from collections import Counter
+import shutil
 
 def crop_image(origin_im, mask_im, count, threshold):
     stack_image = np.concatenate((origin_im, mask_im.reshape(mask_im.shape[0], mask_im.shape[1],1)),axis=2)
-    patches = patchify(stack_image, (56,56,4), step=56)
+    patches = patchify(stack_image, (patch_shape,patch_shape,4), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i,j,0,:,:,:3]
@@ -31,11 +32,19 @@ def checkProportion(im_arr, threshold = 0.7):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "-threshold", type=float, default=0.7, required=False, help="The threshold to use to eliminate images with white proportions")
+    parser.add_argument("-shape", default=56, type=int)
+    parser.add_argument("-stride", default=28, type=int)
     args = parser.parse_args()
     threshold = args.t
+    patch_shape = args.shape
+    stride = args.stride
+    cut_result_path = "./valid_single_patches"
 
-    if not os.path.exists("./valid_single_patches"):
-        os.mkdir("./valid_single_patches")
+    if not os.path.exists(cut_result_path):
+        os.mkdir(cut_result_path)
+    else:
+        shutil.rmtree(cut_result_path)
+        os.mkdir(cut_result_path)
     
     valid_mask_path = 'Dataset/2.validation/mask'
     valid_origin_path = 'Dataset/2.validation/img'
