@@ -1,5 +1,5 @@
 import os
-# os.environ['CUDA_VISIBLE_DEVICES']='2, 3, 4, 5, 6, 7'
+# os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
 import dataset
@@ -23,13 +23,14 @@ def convertinttoonehot(nums_list):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=50, type=int)
-parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True)
+parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-setting', type=str, help='the stride and pathsize setting', required=True)
 parser.add_argument("-bce", action='store_true', help='whether to use bce loss')
 args = parser.parse_args()
 
 batch_size = args.batch
-devices = args.d
+devices = args.device
+print(devices)
 setting_str = args.setting
 use_bce = args.bce
 base_lr = 0.0003
