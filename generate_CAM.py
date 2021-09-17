@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+# os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
 import torch
 import network
 import dataset
@@ -13,7 +13,7 @@ import argparse
 from PIL import Image
 
 side_length = 56
-out_cam = "./test_out_cam"
+out_cam = "./valid_out_cam"
 net = network.ResNetCAM()
 path = "./modelstates/model_last.pth"
 pretrained = torch.load(path)['model']
@@ -31,7 +31,7 @@ net.cuda()
 net.eval()
 
 
-onlineDataset = dataset.OnlineDataset("./Dataset/3.testing/img", transform=transforms.Compose([
+onlineDataset = dataset.OnlineDataset("./Dataset/2.validation/img", transform=transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
