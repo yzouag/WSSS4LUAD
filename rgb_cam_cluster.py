@@ -64,9 +64,9 @@ def get_prediction(original_image, clusters, method='kmeans', heatmap=None, smoo
     white = 2.7
     window_size = 3
     gaussian_k = (3,3)
-    pow = 5
-    threshold = 5e-5
-    weight = 1
+    pow = 2
+    threshold = 1e-2
+    weight = 10
 
     h, w, _ = original_image.shape
     
@@ -198,15 +198,18 @@ k = [2, 1, 1, 2, 2, 1, 2, 2, 2, 3, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2,
      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 3, 3, 3, 2, 2, 2, 2]
 
 if __name__ == "__main__":
-    image_names = os.listdir('2.validation/img')
+    image_name_path = 'Dataset/2.validation/img'
+    image_background_path = 'Dataset/2.validation/background-mask'
+    image_mask_path = 'Dataset/2.validation/mask'
+    image_names = os.listdir(image_name_path)
     method = 'kmeans'
     with_cam = '_cam'
     
     for i in range(30):
-        im_path = os.path.join('2.validation/img', image_names[i])
-        mask_path = os.path.join('2.validation/background-mask', image_names[i])
-        groundtruth_path = os.path.join('2.validation/mask', image_names[i])
-        heatmap_path = os.path.join('cam_val', image_names[i].replace('.png','.npy'))
+        im_path = os.path.join(image_name_path, image_names[i])
+        mask_path = os.path.join(image_background_path, image_names[i])
+        groundtruth_path = os.path.join(image_mask_path, image_names[i])
+        heatmap_path = os.path.join('out_cam', image_names[i].replace('.png','.npy'))
         
         original_image = cv2.imread(im_path)
         mask_image = cv2.imread(mask_path)
@@ -214,7 +217,8 @@ if __name__ == "__main__":
         heatmap = None
         if with_cam != '':
             heatmap = np.load(heatmap_path, allow_pickle=True)
-            heatmap = np.stack(list(heatmap.tolist().values()), axis=2) # stack the heatmap information to a three channel image
+            heatmap = np.transpose(heatmap, (1,2,0))
+            # heatmap = np.stack(list(heatmap.tolist().values()), axis=2) # stack the heatmap information to a three channel image
         
         mask = get_mask(mask_image)
         groundtruth = get_groundtruth(groundtruth_image)
@@ -229,7 +233,7 @@ if __name__ == "__main__":
             w = png.Writer(prediction.shape[1], prediction.shape[0], palette=palette, bitdepth=8)
             w.write(f, prediction)
         
-        with open(f'res_{method}{with_cam}/result.log', 'a') as f:
+        with open(f'result/res_{method}{with_cam}/result.log', 'a') as f:
             f.write(f'image{i}, mIOU={mIOU}\n')
         
         figure_size = 15
@@ -240,5 +244,5 @@ if __name__ == "__main__":
         plt.title(f'Segmented Image, mIOU = {mIOU:.3f}')
         plt.subplot(1, 3, 3), plt.imshow(cv2.cvtColor(groundtruth_image, cv2.COLOR_BGR2RGB))
         plt.title('groundtruth image')
-        plt.savefig(f'res_{method}{with_cam}/{i}.png')
+        plt.savefig(f'result/res_{method}{with_cam}/{i}.png')
         plt.close()
