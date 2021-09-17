@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 import argparse
 from PIL import Image
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", default=50, type=int)
+args = parser.parse_args()
+
+batch_size = args.batch
 side_length = 56
 out_cam = "./test_out_cam"
 net = network.ResNetCAM()

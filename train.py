@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2'
+os.environ['CUDA_VISIBLE_DEVICES']='2, 3, 4, 5, 6, 7'
 import torch
 import network
 import dataset
@@ -45,12 +45,12 @@ model_dict.update(pretrained_dict)
 # Load pretraiend parameters
 net.load_state_dict(model_dict)
 
-net = torch.nn.DataParallel(net, device_ids=[0]).cuda()
+net = torch.nn.DataParallel(net, device_ids=[0, 1, 2, 3]).cuda()
 net.train()
 
 TrainDataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
-    transforms.Resize(256),
-    transforms.RandomCrop(224),
+    transforms.Resize(224),
+    # transforms.RandomCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.ToTensor(),

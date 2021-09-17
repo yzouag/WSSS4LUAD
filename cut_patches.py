@@ -5,13 +5,14 @@ from patchify import patchify
 import argparse
 from tqdm import tqdm
 from multiprocessing import Pool
+import shutil
 
 def cropImage(file_info):
     imfile, c, count, threshold = file_info
     full_path = './Dataset/1.training/' + imfile
     im = Image.open(full_path)
     im_arr = np.asarray(im)
-    patches = patchify(im_arr, (56, 56, 3), step = 28)
+    patches = patchify(im_arr, (patch_shape, patch_shape, 3), step = stride)
     # print(patches.shape)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
@@ -41,12 +42,19 @@ def checkProportion(im_arr, threshold = 0.5):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False, help="The threshold to use to eliminate images with white proportions")
+    parser.add_argument("-shape", default=56, type=int)
+    parser.add_argument("-stride", default=28, type=int)
     args = parser.parse_args()
     threshold = args.t
+    patch_shape = args.shape
+    stride = args.stride
     # print(threshold)
-
-    if not os.path.exists("./train_single_patches"):
-        os.mkdir("./train_single_patches")
+    cut_result_path = "./train_single_patches"
+    if not os.path.exists(cut_result_path):
+        os.mkdir(cut_result_path)
+    else:
+        shutil.rmtree(cut_result_path)
+        os.mkdir(cut_result_path)
 
     single_dict = {"[1, 0, 0]": 0, "[0, 1, 0]": 1, "[0, 0, 1]": 2}
     
