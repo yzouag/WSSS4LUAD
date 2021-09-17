@@ -15,6 +15,35 @@ mask_path = 'Dataset/2.validation/background-mask'
 
 if not os.path.exists("./heatmap1"):
     os.mkdir("./heatmap1")
+import shutil
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
+args = parser.parse_args()
+
+for_validation = args.v
+if for_validation:
+    img_path = 'Dataset/2.validation/img'
+    mask_path = 'Dataset/2.validation/mask'
+    cam_path = './validation_out_cam'
+    heatmap_path = "./validation_heatmap"
+    assert os.path.exists(cam_path), "The cam for validation has not been generated!"
+else:
+    img_path = 'Dataset/3.testing/img'
+    mask_path = 'Dataset/3.testing/mask'
+    cam_path = './test_out_cam'
+    heatmap_path = "./test_heatmap"
+    assert os.path.exists(cam_path), "The cam for testing has not been generated!"
+
+image_names = os.listdir(img_path)
+npy_names = os.listdir(cam_path)
+
+if not os.path.exists(heatmap_path):
+    os.mkdir(heatmap_path)
+else:
+    shutil.rmtree(heatmap_path)
+    os.mkdir(heatmap_path)
 
 
 
