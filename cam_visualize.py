@@ -4,9 +4,10 @@ import os
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-img_path = 'Dataset/2.validation/img'
+# img_path = 'Dataset/2.validation/img'
+img_path = 'Dataset/3.testing/img'
 image_names = os.listdir(img_path)
-cam_path = 'out_cam'
+cam_path = 'test_out_cam'
 npy_names = os.listdir(cam_path)
 mask_path = 'Dataset/2.validation/mask'
 

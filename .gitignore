@@ -7,6 +7,8 @@ network/__pycache__/
 *.pth
 real_test.py
 modelstates/
-out_cam/
+validation_out_cam/
+test_out_cam/
 testing.ipynb
 heatmap/
+test_results/

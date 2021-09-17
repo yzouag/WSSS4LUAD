@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
 import dataset
@@ -45,7 +45,7 @@ model_dict.update(pretrained_dict)
 # Load pretraiend parameters
 net.load_state_dict(model_dict)
 
-net = torch.nn.DataParallel(net, device_ids=[0, 1, 2]).cuda()
+net = torch.nn.DataParallel(net, device_ids=[0]).cuda()
 net.train()
 
 TrainDataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
@@ -61,10 +61,11 @@ TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
-criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
+# criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
+criteria = torch.nn.CrossEntropyLoss(reduction='mean')
 criteria.cuda()
 
-epochs = 30
+epochs = 15
 loss_g = []
 accuracy_g = []
 
@@ -76,13 +77,15 @@ for i in range(epochs):
     for img, label in tqdm(TrainDataloader):
         count += 1
         img = img.cuda()
-        onehot_label = convertinttoonehot(label).cuda()
+        label = label.cuda()
+        # onehot_label = convertinttoonehot(label).cuda()
 
         scores = net(img)
         
-        loss = criteria(scores, onehot_label)
+        # loss = criteria(scores, onehot_label)
+        loss = criteria(scores, label)
         level = scores.detach().argmax(dim = 1)
-        label = label.cuda()
+        # label = label.cuda()
         b = level == label
         correct += torch.sum(b).item()
         # print("level: ", torch.sum(b).item())
@@ -97,18 +100,18 @@ for i in range(epochs):
     print("accuracy: ", correct / (count * batch_size))
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
-    if (i + 1) % 5 == 0:
-        torch.save(net.state_dict(), "./model_ep"+str(i+1)+".pth")
+    if (i + 1) % 5 == 0 and (i + 1) != epochs:
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/cemodel_ep"+str(i+1)+".pth")
 
 fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/loss.png')
-torch.save(net.state_dict(), "./model_last.pth")
+plt.savefig('./image/celoss.png')
+torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/cemodel_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/accuracy.png')
+plt.savefig('./image/ceaccuracy.png')

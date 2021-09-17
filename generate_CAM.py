@@ -13,7 +13,7 @@ import argparse
 from PIL import Image
 
 side_length = 56
-out_cam = "./out_cam"
+out_cam = "./test_out_cam"
 net = network.ResNetCAM()
 path = "./modelstates/model_last.pth"
 pretrained = torch.load(path)['model']
@@ -31,7 +31,7 @@ net.cuda()
 net.eval()
 
 
-onlineDataset = dataset.OnlineDataset("./Dataset/2.validation/img", transform=transforms.Compose([
+onlineDataset = dataset.OnlineDataset("./Dataset/3.testing/img", transform=transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
@@ -65,18 +65,19 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
         y, x = position_list[i][0], position_list[i][1]
         crop = cam_list[i]
         # print("i is :",i)
-        print(f"y: {y}, x: {x}")
+        # print(f"y: {y}, x: {x}")
         sum_cam[:, y:y+side_length, x:x+side_length] += crop
         sum_counter[:, y:y+side_length, x:x+side_length] += 1
     sum_counter[sum_counter < 1] = 1
 
     sum_cam = sum_cam / sum_counter
-    cam_max = np.max(sum_cam, (1,2), keepdims=True)
-    cam_min = np.min(sum_cam, (1,2), keepdims=True)
-    sum_cam[sum_cam < cam_min+1e-5] = 0
-    norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
+    # cam_max = np.max(sum_cam, (1,2), keepdims=True)
+    # cam_min = np.min(sum_cam, (1,2), keepdims=True)
+    # sum_cam[sum_cam < cam_min+1e-5] = 0
+    # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
+    result_label = sum_cam.argmax(axis=0)
 
     if out_cam is not None:
         if not os.path.exists(out_cam):
             os.makedirs(out_cam)
-        np.save(os.path.join(out_cam, im_path[0].split('/')[-1].split('.')[0] + '.npy'), norm_cam)
+        np.save(os.path.join(out_cam, im_path[0].split('/')[-1].split('.')[0] + '.npy'), result_label)
