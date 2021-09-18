@@ -22,6 +22,23 @@ class SingleLabelDataset(Dataset):
         label = int(self.files[idx][-5:-4])
         return im, label
 
+class OriginPatchesDataset(Dataset):
+    def __init__(self, data_path_name = "Dataset/1.training", transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(data_path_name)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+
+        if self.transform:
+            im = self.transform(im)
+        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])], dtype = int)
+        return im, label
 
 class OnlineDataset(Dataset):
     def __init__(self, data_path_name, transform=None, patch_size = 56, stride=28):
