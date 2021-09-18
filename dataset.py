@@ -40,6 +40,31 @@ class OriginPatchesDataset(Dataset):
         label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
         return im, label
 
+class OriginVaidationDataset(Dataset):
+    def __init__(self, data_path_name = "Dataset/2.validation", transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(os.path.join(data_path_name, "img"))[:30]
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, "img", self.files[idx])
+        label_path = os.path.join(self.path, "mask", self.files[idx])
+        im = Image.open(image_path)
+        label_arr = np.asarray(Image.open(label_path))
+
+        if self.transform:
+            im = self.transform(im)
+        s = set()
+        for i in range(label_arr.shape[0]):
+            for j in range(label_arr.shape[1]):
+                s.add(label_arr[i][j])
+
+        label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+        return im, label
+
 class OnlineDataset(Dataset):
     def __init__(self, data_path_name, transform=None, patch_size = 56, stride=28):
         self.path = data_path_name

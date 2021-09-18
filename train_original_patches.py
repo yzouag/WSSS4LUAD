@@ -13,13 +13,16 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=64, type=int)
+parser.add_argument("-epoch", default=100, type=int)
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
-parser.add_argument('-t', type=float, default = 0.8, required=False, help='the threshold probability to set the label of the image to 1')
+parser.add_argument('-t', type=float, default = 0.9, required=False, help='the threshold probability to set the label of the image to 1')
+# parser.add_argument("-v", action='store_true', help='whether it is to validate')
 args = parser.parse_args()
 
 batch_size = args.batch
 devices = args.device
 threshold = args.t
+epochs = args.epoch
 base_lr = 0.0003
 net = network.ResNet().cuda()
 
@@ -51,7 +54,6 @@ criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
 
-epochs = 40
 loss_g = []
 accuracy_g = []
 
@@ -71,7 +73,7 @@ for i in range(epochs):
         
         predict = scores>=threshold # check dtype here
         for k in range(len(onehot_label)):
-            if torch.equal(onehot_label[i], predict[i]):
+            if torch.equal(onehot_label[k], predict[k]):
                 correct += 1
         
         # Calculate for the three statistics
