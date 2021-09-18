@@ -37,7 +37,7 @@ class OriginPatchesDataset(Dataset):
 
         if self.transform:
             im = self.transform(im)
-        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])], dtype = int)
+        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
         return im, label
 
 class OnlineDataset(Dataset):
