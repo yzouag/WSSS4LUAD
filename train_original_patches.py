@@ -1,4 +1,5 @@
 import os
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
 import dataset
@@ -12,15 +13,15 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch", default=64, type=int)
+parser.add_argument("--batch", default=32, type=int)
 parser.add_argument("-epoch", default=100, type=int)
-parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
+# parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-t', type=float, default = 0.9, required=False, help='the threshold probability to set the label of the image to 1')
 # parser.add_argument("-v", action='store_true', help='whether it is to validate')
 args = parser.parse_args()
 
 batch_size = args.batch
-devices = args.device
+# devices = args.device
 threshold = args.t
 epochs = args.epoch
 base_lr = 0.0001
@@ -35,7 +36,8 @@ model_dict.update(pretrained_dict)
 # Load pretraiend parameters
 net.load_state_dict(model_dict)
 
-net = torch.nn.DataParallel(net, device_ids=devices).cuda()
+# net = torch.nn.DataParallel(net, device_ids=devices).cuda()
+net = net.cuda()
 
 TrainDataset = dataset.OriginPatchesDataset(transform=transforms.Compose([
     transforms.Resize((224,224)),
@@ -46,13 +48,6 @@ TrainDataset = dataset.OriginPatchesDataset(transform=transforms.Compose([
 
 print("Dataset", len(TrainDataset))
 
-validDataset = dataset.OriginVaidationDataset(transform=transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
-
-print("Dataset", len(validDataset))
-ValidDataloader = DataLoader(validDataset, batch_size=20, num_workers=2, drop_last=False)
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
@@ -80,7 +75,12 @@ for i in range(epochs):
         onehot_label = label.cuda() # gt label of n * 3
         loss = criteria(scores, onehot_label.float())
         
-        predict = scores>=threshold # check dtype here
+        optimizer.zero_grad()
+        loss.backward()
+
+        optimizer.step()
+        running_loss += loss.item()
+        predict = scores.detach()>=threshold # check dtype here
         for k in range(len(onehot_label)):
             if torch.equal(onehot_label[k], predict[k]):
                 correct += 1
@@ -92,12 +92,6 @@ for i in range(epochs):
             helpdic[tissue][0] += gt_type[predict_type].sum().item()
             helpdic[tissue][1] += (~gt_type[predict_type]).sum().item()
             helpdic[tissue][2] += (~predict_type[gt_type]).sum().item()
-        
-        optimizer.zero_grad()
-        loss.backward()
-
-        optimizer.step()
-        running_loss += loss.item()
 
     scheduler.step()
     print("loss: ", running_loss / count)
@@ -110,6 +104,13 @@ for i in range(epochs):
     if (i + 1) % 10 == 0 and (i + 1) != epochs:
         torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch_model_ep"+str(i+1)+".pth")
 
+    validDataset = dataset.OriginVaidationDataset(transform=transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+
+    print("Dataset", len(validDataset))
+    ValidDataloader = DataLoader(validDataset, batch_size=20, num_workers=2, drop_last=False)
     net.eval()
     with torch.no_grad():
         count = 0
