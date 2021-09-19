@@ -41,28 +41,45 @@ class OriginPatchesDataset(Dataset):
         return im, label
 
 class OriginVaidationDataset(Dataset):
-    def __init__(self, data_path_name = "Dataset/2.validation", transform=None):
-        self.path = data_path_name
-        self.files = os.listdir(os.path.join(data_path_name, "img"))[:30]
+    def __init__(self, transform=None):
+        self.path_v = "Dataset/2.validation"
+        self.path_t = "Dataset/1.training"
+        self.files_v = os.listdir(os.path.join("Dataset/2.validation", "img"))[:30]
+        # Randomly choose 170 images from training to valid dataset
+        sample_index = np.random.choice(10000, 170, replace=False)
+        self.files_t = []
+        for index in sample_index:
+            self.files_t.append(os.listdir("Dataset/1.training")[index])
+        
         self.transform = transform
 
     def __len__(self):
-        return len(self.files)
+        return len(self.files_v) + len(self.files_t)
 
     def __getitem__(self, idx):
-        image_path = os.path.join(self.path, "img", self.files[idx])
-        label_path = os.path.join(self.path, "mask", self.files[idx])
-        im = Image.open(image_path)
-        label_arr = np.asarray(Image.open(label_path))
+        if idx < 30:
+            image_path = os.path.join(self.path_v, "img", self.files_v[idx])
+            label_path = os.path.join(self.path_v, "mask", self.files_v[idx])
+            im = Image.open(image_path)
+            label_arr = np.asarray(Image.open(label_path))
 
-        if self.transform:
-            im = self.transform(im)
-        s = set()
-        for i in range(label_arr.shape[0]):
-            for j in range(label_arr.shape[1]):
-                s.add(label_arr[i][j])
+            if self.transform:
+                im = self.transform(im)
+            s = set()
+            for i in range(label_arr.shape[0]):
+                for j in range(label_arr.shape[1]):
+                    s.add(label_arr[i][j])
 
-        label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+            label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+        else:
+            # for the data from training set
+            idx = idx - 30
+            image_path = os.path.join(self.path_t, self.files_t[idx])
+            im = Image.open(image_path)
+
+            if self.transform:
+                im = self.transform(im)
+            label = np.array([int(self.files_t[idx][-12]), int(self.files_t[idx][-9]), int(self.files_t[idx][-6])])
         return im, label
 
 class OnlineDataset(Dataset):
