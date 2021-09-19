@@ -1,12 +1,16 @@
+from multiprocessing.context import Process
 import os
 import numpy as np
 from PIL import Image
 from patchify import patchify
 import argparse
-from multiprocessing import Pool
+from multiprocessing import Manager, Pool
 import shutil
-from collections import Counter
 from tqdm import tqdm
+import torch
+import network
+from torchvision import transforms
+from math import ceil
 
 
 def crop_train_image(file_info):
@@ -25,8 +29,30 @@ def crop_train_image(file_info):
                             "_" + str(i) + str(j) + '_' + str(im_type) + '.png')
 
 
-def get_label_from_nn(sub_image):
-    pass
+# # todo: add consideration for the whole image, need to run paralelly and add a gridsearch for threshold
+# # change the output to sigmoid
+# def get_label_from_nn(sub_image, f, upper=1, lower=-1):
+#     im_type = [0, 0, 0]
+#     transform = transforms.Compose([
+#         transforms.ToPILImage(),
+#         transforms.Resize(224),
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+#     image = transform(sub_image)
+#     image = image.reshape((1, 3, 224, 224))
+#     with torch.no_grad():
+#         input = image.cuda()
+#         score = torch.sigmoid(net(input))
+#         result = score.cpu().numpy().reshape(-1)
+#     f.write(str(result) + '\n')
+#     for i in range(3):
+#         if result[i] > upper:
+#             im_type[i] = 1
+#         elif result[i] < lower:
+#             im_type[i] = 0
+#         else:
+#             im_type[i] = -1
+#     return im_type
 
 
 def crop_valid_image(origin_im, mask_im, count, threshold, cut_result_path):
@@ -59,6 +85,7 @@ def is_valid_crop(im_arr, threshold=0.5, groundtruth=True):
         else:
             return True
 
+
 def get_labels(label, threshold=0.3):
     pix_type, pix_count = np.unique(label, return_counts=True)
     im_type = [0, 0, 0, 0]
@@ -67,20 +94,72 @@ def get_labels(label, threshold=0.3):
             im_type[pix_type[i]] = 1
     return im_type[:3]
 
-def test_crop_accuracy(test_path):
+
+def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=64):
     files = os.listdir(test_path)
+    image_chunks = chunks(files, num_workers, -1)
+    
+    with Manager() as manager:
+        L = manager.list()
+        processes = []
+        for i in range(num_workers):
+            p = Process(target=predict_image_score, args=(L,image_chunks[i], test_path, batch_size))
+            p.start()
+            processes.append(p)
+        for p in processes:
+            p.join()
+        if not os.path.exists('image_label_score'):
+            os.mkdir('image_label_score')
+        np.save(f'image_label_score/{save_name}.npy', list(L))
+
+# TODO
+def test_crop_accuracy(score_path, lower_bound, higher_bound):
     count = 0
-    for image_name in files:
-        full_path = os.path.join(test_path, image_name)
-        label = image_name[-13:-4]
-        groundtruth = [int(label[1]), int(label[4]), int(label[7])]
-        image = np.asarray(Image.open(full_path))
-        prediction = get_label_from_nn(image)
-        if groundtruth == prediction:
-            count += 1
-    print(count/len(files))
+    scores = np.load(score_path, allow_pickle=True)
+    
 
+def make_chunk(target_list, n):
+    for i in range(0, len(target_list), n):
+        yield target_list[i:i + n]
 
+def predict_image_score(l, image_list, valid, batch_size=64):
+    model_path = 'modelstates/model_last.pth'
+    model_param = torch.load(model_path)['model']
+    net = network.ResNet()
+    net.load_state_dict(model_param)
+    print(f'Model loaded from {model_path}')
+    net.cuda()
+    net.eval()
+
+    image_batches = chunks(image_list, -1, batch_size)
+    for image_batch in tqdm(image_batches):
+        img_list = []
+        for i in range(len(image_batch)):
+            sub_image = np.asarray(Image.open(valid + image_batch[i]))
+            transform = transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.Resize(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+            image = transform(sub_image)
+            img_list.append(image)
+        with torch.no_grad():
+            image = torch.stack(img_list, dim=0).cuda()
+            score = torch.sigmoid(net(image))
+            score = score.cpu().numpy().reshape(len(image_batch), 3)
+        l.extend(list(zip(image_batch, score)))
+
+def chunks(lst, num_workers, n):
+    chunk_list = []
+    if n == -1:
+        n = ceil(len(lst)/num_workers)
+        for i in range(0, len(lst), n):
+            chunk_list.append(lst[i:i + n])
+        return chunk_list
+    else:
+        for i in range(0, len(lst), n):
+            chunk_list.append(lst[i:i + n])
+        return chunk_list
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -89,22 +168,27 @@ if __name__ == "__main__":
     parser.add_argument("-shape", default=56, type=int)
     parser.add_argument("-stride", default=28, type=int)
     parser.add_argument("-d", "--dataset", default=1, type=int,
-                        help="the crop dataset, 1.training, 2.validation, 3.testing", required=True, choices=[1, 2, 3])
+                        help="the crop dataset, 1.training, 2.validation, 3.testing", choices=[1, 2, 3])
     parser.add_argument("-test", action='store_true', help='take the test')
     args = parser.parse_args()
-    
+
+    # model_path = 'modelstates/model_last.pth'
+    # model_param = torch.load(model_path)['model']
+    # net = network.ResNet()
+    # net.load_state_dict(model_param)
+    # print(f'Model loaded from {model_path}')
+    # net.cuda()
+    # net.eval()
+
     if args.test:
-        valid = 'valid_single_patches'
-        test_crop_accuracy(valid)
+        valid = 'valid_single_patches/'
+        generate_image_label_score(valid, 'validation', num_workers=1)
         exit()
 
     threshold = args.t
     patch_shape = args.shape
     stride = args.stride
     dataset = args.dataset
-
-    model_path = 'modelstates/'
-
 
     if dataset == 1:
         dataset_path = 'Dataset/1.training'
