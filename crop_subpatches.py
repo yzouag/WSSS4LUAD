@@ -11,7 +11,7 @@ import torch
 import network
 from torchvision import transforms
 from math import ceil
-
+from sklearn.metrics import f1_score
 
 def crop_train_image(file_info):
     imfile, count, threshold = file_info
@@ -112,11 +112,32 @@ def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=6
             os.mkdir('image_label_score')
         np.save(f'image_label_score/{save_name}.npy', list(L))
 
-# TODO
-def test_crop_accuracy(score_path, lower_bound, higher_bound):
-    count = 0
+def test_crop_accuracy(score_path):
     scores = np.load(score_path, allow_pickle=True)
-    
+    gt = []
+    pred = []
+    for i in range(len(scores)):
+        pred.append(scores[i][1])
+        label = scores[i][0][-13:-4]
+        gt.append([int(label[1]), int(label[4]), int(label[7])])
+    pred = np.stack(pred)
+    gt = np.stack(gt)
+
+    best_f1_score = 0
+    for lower_bound in np.arange(0,0.5,0.02):
+        for upper_bound in np.arange(0.5,1,0.02):
+            for i in range(3):
+                pred[:,i][pred[:,i] < lower_bound] = 0
+                pred[:,i][pred[:,i] > upper_bound] = 1
+                pred[:,i][np.logical_and(pred[:,i] >= lower_bound,pred[:,i] <= upper_bound)] = -1
+            print(pred.transpose().shape)
+            print(gt.shape)
+            score = f1_score(gt.transpose(), pred.transpose(), average='macro')
+            if score > best_f1_score:
+                best_f1_score = score
+                threshold = (lower_bound, upper_bound)
+    return best_f1_score, threshold
+            
 
 def make_chunk(target_list, n):
     for i in range(0, len(target_list), n):
@@ -172,17 +193,10 @@ if __name__ == "__main__":
     parser.add_argument("-test", action='store_true', help='take the test')
     args = parser.parse_args()
 
-    # model_path = 'modelstates/model_last.pth'
-    # model_param = torch.load(model_path)['model']
-    # net = network.ResNet()
-    # net.load_state_dict(model_param)
-    # print(f'Model loaded from {model_path}')
-    # net.cuda()
-    # net.eval()
-
     if args.test:
-        valid = 'valid_single_patches/'
-        generate_image_label_score(valid, 'validation', num_workers=1)
+        # valid = 'valid_single_patches/'
+        # generate_image_label_score(valid, 'validation', num_workers=1)
+        print(test_crop_accuracy('image_label_score/validation.npy'))
         exit()
 
     threshold = args.t
