@@ -82,6 +82,33 @@ class OriginVaidationDataset(Dataset):
             label = np.array([int(self.files_t[idx][-12]), int(self.files_t[idx][-9]), int(self.files_t[idx][-6])])
         return im, label
 
+class OriginVaidationNoMixDataset(Dataset):
+    def __init__(self, transform=None):
+        self.path_v = "Dataset/2.validation"
+        self.files_v = os.listdir(os.path.join("Dataset/2.validation", "img"))[:30]
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files_v)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path_v, "img", self.files_v[idx])
+        label_path = os.path.join(self.path_v, "mask", self.files_v[idx])
+        im = Image.open(image_path)
+        label_arr = np.asarray(Image.open(label_path))
+
+        if self.transform:
+            im = self.transform(im)
+        s = set()
+        for i in range(label_arr.shape[0]):
+            for j in range(label_arr.shape[1]):
+                s.add(label_arr[i][j])
+
+        label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+        # print(str(idx), label)
+
+        return im, label
+
 class OnlineDataset(Dataset):
     def __init__(self, data_path_name, transform=None, patch_size = 56, stride=28):
         self.path = data_path_name

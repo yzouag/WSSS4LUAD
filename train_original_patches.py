@@ -1,4 +1,5 @@
 import os
+from threading import current_thread
 # os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
@@ -61,6 +62,9 @@ accuracy_g = []
 valid_accuracy = []
 threshold_list = []
 f1_scores = []
+best_threshold = []
+best_f1mean = 0
+# follow_accuracy = 0
 
 for i in range(epochs):
     print('This is epoch', i)
@@ -118,7 +122,7 @@ for i in range(epochs):
     net.eval()
 
     with torch.no_grad():
-        helpdic = {"tumor":[0, 0, 0], "stroma":[0, 0, 0], "normal":[0, 0, 0]} # TP, FP, FN
+        helpdic = {"tumor":[0, 0, 0, 0, 0], "stroma":[0, 0, 0, 0, 0], "normal":[0, 0, 0, 0, 0]} # TP, FP, FN, bestf1, threshold
         remember_all_predict = []
         remember_all_label = []
 
@@ -129,22 +133,10 @@ for i in range(epochs):
             scores = net(img) # probability of n * 3
             onehot_label = label.cuda() # gt label of n * 3
             scores = F.sigmoid(scores)
-            assert torch.all(scores>=0)
-            assert torch.all(scores<=1)
+            # assert torch.all(scores>=0)
+            # assert torch.all(scores<=1)
             remember_all_predict.append(scores.detach())
             remember_all_label.append(onehot_label.detach())
-            # predict = scores>=threshold
-            # for k in range(len(onehot_label)):
-            #     if torch.equal(onehot_label[k], predict[k]):
-            #         correct += 1
-
-            # # Calculate for the three statistics
-            # for index, tissue in enumerate(["tumor", "stroma", "normal"]):
-            #     predict_type = predict[:, index].bool()
-            #     gt_type = onehot_label[:, index].bool()
-            #     helpdic[tissue][0] += gt_type[predict_type].sum().item()
-            #     helpdic[tissue][1] += (~gt_type[predict_type]).sum().item()
-            #     helpdic[tissue][2] += (~predict_type[gt_type]).sum().item()
 
     # iter through validdataloader, start grid search
 
@@ -154,49 +146,59 @@ for i in range(epochs):
     count = len(remember_all_label)
     assert count == 200, "error: tensor size not equal to dataset size!"
 
-    best_threshold = 0
-    best_f1mean = 0
-    follow_accuracy = 0
-
-    for threshold in tqdm(np.arange(0, 1, step = 0.02)):
+    for threshold in tqdm(np.arange(0, 1, step = 0.01)):
         # calculate accuracy
-        correct = 0
+        # correct = 0
         predict = remember_all_predict >= threshold
-        for k in range(len(predict)):
-            if torch.equal(remember_all_label[k], predict[k]):
-                correct += 1
-        accuracy = correct / count
+        # for k in range(len(predict)):
+        #     if torch.equal(remember_all_label[k], predict[k]):
+        #         correct += 1
+        # accuracy = correct / count
 
         # Calculate for the three statistics
-        temp_f1 = []
+        # temp_f1 = np.zeros(3)
         for index, tissue in enumerate(["tumor", "stroma", "normal"]):
             predict_type = predict[:, index].bool()
             gt_type = remember_all_label[:, index].bool()
             helpdic[tissue][0] = gt_type[predict_type].sum().item()
             helpdic[tissue][1] = (~gt_type[predict_type]).sum().item()
             helpdic[tissue][2] = (~predict_type[gt_type]).sum().item()
-            precision = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1])
-            recall = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2])
-            f1_score = 2 * precision * recall / (precision + recall)
-            temp_f1.append(f1_score)
-        
-        current_f1mean = sum(temp_f1) / len(temp_f1)
-        if current_f1mean > best_f1mean:
-            best_f1mean = current_f1mean
-            best_threshold = threshold
-            follow_accuracy = accuracy
+            precision = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1] + 1e-6)
+            recall = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2] + 1e-6)
+            f1_score = 2 * precision * recall / (precision + recall + 1e-6)
+            if f1_score > helpdic[tissue][3]:
+                helpdic[tissue][3] = f1_score
+                helpdic[tissue][4] = threshold
+                # temp_f1[index] = f1_score
             
-    print("validation accuracy: ", follow_accuracy)
+        
+        # current_f1mean = sum(temp_f1) / len(temp_f1)
+        # if current_f1mean > best_f1mean:
+        #     best_f1mean = current_f1mean
+        #     best_threshold = threshold
+        #     follow_accuracy = accuracy
+
+    current_f1mean =  (helpdic["tumor"][3] + helpdic["stroma"][3] + helpdic["normal"][3]) / 3
+    current_t =  np.array([helpdic["tumor"][4], helpdic["stroma"][4], helpdic["normal"][4]])
+    if current_f1mean > best_f1mean:
+        print("updating..........................................")
+        best_f1mean = current_f1mean
+        best_threshold = np.array([helpdic["tumor"][4], helpdic["stroma"][4], helpdic["normal"][4]])
+        # follow_accuracy = accuracy
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch_model_best.pth")
+    # print("validation accuracy: ", follow_accuracy)
     print("validation threshold: ", best_threshold)
-    print("validation f1 mean: ", best_f1mean)
-    valid_accuracy.append(follow_accuracy)
+    print("validation best f1 mean: ", best_f1mean)
+    print("validation current f1 mean: ", current_f1mean)
+    print("validation current threshold: ", current_t)
+    # valid_accuracy.append(follow_accuracy)
 
     # for tissue in ["tumor", "stroma", "normal"]:
     #     print("validation precision for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1]))
     #     print("validation recall for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2]))
 
-    threshold_list.append(best_threshold)
-    f1_scores.append(best_f1mean)
+    # threshold_list.append(best_threshold)
+    f1_scores.append(current_f1mean)
 
 fig=plt.figure()
 plt.plot(loss_g)
@@ -211,11 +213,11 @@ plt.ylabel('accuracy')
 plt.xlabel('epochs')
 plt.savefig('./image/bigpatch_accuracy.png')
 
-fig=plt.figure()
-plt.plot(valid_accuracy)
-plt.ylabel('validation accuracy')
-plt.xlabel('epochs')
-plt.savefig('./image/bigpatch_validaccuracy.png')
+# fig=plt.figure()
+# plt.plot(valid_accuracy)
+# plt.ylabel('validation accuracy')
+# plt.xlabel('epochs')
+# plt.savefig('./image/bigpatch_validaccuracy.png')
 
 fig=plt.figure()
 plt.plot(f1_scores)
@@ -223,11 +225,11 @@ plt.ylabel('validation mean f1 scores')
 plt.xlabel('epochs')
 plt.savefig('./image/bigpatch_f1mean.png')
 
-fig=plt.figure()
-plt.plot(threshold_list)
-plt.ylabel('validation threshold')
-plt.xlabel('epochs')
-plt.savefig('./image/bigpatch_threshold.png')
+# fig=plt.figure()
+# plt.plot(threshold_list)
+# plt.ylabel('validation threshold')
+# plt.xlabel('epochs')
+# plt.savefig('./image/bigpatch_threshold.png')
 
-threshold_list = np.array(threshold_list)
-np.save("./threshold.npy", threshold_list)
+# threshold_list = np.array(threshold_list)
+# np.save("./threshold.npy", threshold_list)
