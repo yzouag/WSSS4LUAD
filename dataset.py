@@ -25,7 +25,10 @@ class SingleLabelDataset(Dataset):
 class OriginPatchesDataset(Dataset):
     def __init__(self, data_path_name = "Dataset/1.training", transform=None):
         self.path = data_path_name
+        # Need to eliminate the validation part from training
         self.files = os.listdir(data_path_name)
+        # sample_index = np.load("sample_index.npy")
+        # self.files = np.delete(origintrain, sample_index)
         self.transform = transform
 
     def __len__(self):
@@ -43,18 +46,17 @@ class OriginPatchesDataset(Dataset):
 class OriginVaidationDataset(Dataset):
     def __init__(self, transform=None):
         self.path_v = "Dataset/2.validation"
-        self.path_t = "Dataset/1.training"
+        # self.path_t = "Dataset/1.training"
         self.files_v = os.listdir(os.path.join("Dataset/2.validation", "img"))[:30]
-        # Randomly choose 170 images from training to valid dataset
-        sample_index = np.random.choice(10000, 170, replace=False)
-        self.files_t = []
-        for index in sample_index:
-            self.files_t.append(os.listdir("Dataset/1.training")[index])
+        # Use the pre-generated random number
+        # sample_index = np.load("sample_index.npy")
+        # self.files_t = np.array(os.listdir("Dataset/1.training"))[sample_index]
+        self.files_b = os.listdir(os.path.join("Dataset/2.validation", "bigimg"))
         
         self.transform = transform
 
     def __len__(self):
-        return len(self.files_v) + len(self.files_t)
+        return len(self.files_v)  + len(self.files_b)
 
     def __getitem__(self, idx):
         if idx < 30:
@@ -71,15 +73,60 @@ class OriginVaidationDataset(Dataset):
                     s.add(label_arr[i][j])
 
             label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
-        else:
-            # for the data from training set
+        # elif idx < 200:
+        #     # for the data from training set
+        #     idx = idx - 30
+        #     image_path = os.path.join(self.path_t, self.files_t[idx])
+        #     im = Image.open(image_path)
+
+        #     if self.transform:
+        #         im = self.transform(im)
+        #     label = np.array([int(self.files_t[idx][-12]), int(self.files_t[idx][-9]), int(self.files_t[idx][-6])])
+        else: # here we need big validation images
             idx = idx - 30
-            image_path = os.path.join(self.path_t, self.files_t[idx])
+            image_path = os.path.join(self.path_v, "bigimg", self.files_b[idx])
+            label_path = os.path.join(self.path_v, "bigmask", self.files_b[idx])
             im = Image.open(image_path)
+            label_arr = np.asarray(Image.open(label_path))
 
             if self.transform:
                 im = self.transform(im)
-            label = np.array([int(self.files_t[idx][-12]), int(self.files_t[idx][-9]), int(self.files_t[idx][-6])])
+            # s = set()
+            # for i in range(label_arr.shape[0]):
+            #     for j in range(label_arr.shape[1]):
+            #         s.add(label_arr[i][j])
+            bin = np.bincount(label_arr.flatten())
+            assert len(bin) == 4
+
+            # label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+            label = np.array([1 if bin[0] > 6000 else 0, 1 if bin[1] > 6000 else 0, 1 if bin[2] > 6000 else 0])
+        return im, label
+
+class OriginVaidationNoMixDataset(Dataset):
+    def __init__(self, transform=None):
+        self.path_v = "Dataset/2.validation"
+        self.files_v = os.listdir(os.path.join("Dataset/2.validation", "img"))[:30]
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files_v)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path_v, "img", self.files_v[idx])
+        label_path = os.path.join(self.path_v, "mask", self.files_v[idx])
+        im = Image.open(image_path)
+        label_arr = np.asarray(Image.open(label_path))
+
+        if self.transform:
+            im = self.transform(im)
+        s = set()
+        for i in range(label_arr.shape[0]):
+            for j in range(label_arr.shape[1]):
+                s.add(label_arr[i][j])
+
+        label = np.array([1 if 0 in s else 0, 1 if 1 in s else 0, 1 if 2 in s else 0])
+        # print(str(idx), label)
+
         return im, label
 
 class OnlineDataset(Dataset):

@@ -13,3 +13,4 @@ testing.ipynb
 heatmap/
 test_results/
 validation_results/
+*.npy

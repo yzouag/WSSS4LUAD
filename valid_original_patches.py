@@ -19,7 +19,7 @@ args = parser.parse_args()
 batch_size = args.batch
 threshold = args.t
 net = network.ResNet()
-path = "./modelstates/bigpatch_model_last.pth"
+path = "./modelstates/bigpatch6000_model_last.pth"
 pretrained = torch.load(path)['model']
 pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained_modify)
@@ -36,32 +36,70 @@ print("Dataset", len(validDataset))
 ValidDataloader = DataLoader(validDataset, batch_size=batch_size, num_workers=2, drop_last=False)
 
 with torch.no_grad():
-    count = 0
-    correct = 0
     helpdic = {"tumor":[0, 0, 0], "stroma":[0, 0, 0], "normal":[0, 0, 0]} # TP, FP, FN
+    remember_all_predict = []
+    remember_all_label = []
 
     for img, label in tqdm(ValidDataloader):
-        count += img.shape[0]
+        # count += img.shape[0]
         img = img.cuda()
         
         scores = net(img) # probability of n * 3
         onehot_label = label.cuda() # gt label of n * 3
-        
-        predict = scores>=threshold # check dtype here
-        for k in range(len(onehot_label)):
-            if torch.equal(onehot_label[k], predict[k]):
-                correct += 1
-        
-        # Calculate for the three statistics
-        for index, tissue in enumerate(["tumor", "stroma", "normal"]):
-            predict_type = predict[:, index].bool()
-            gt_type = onehot_label[:, index].bool()
-            helpdic[tissue][0] += gt_type[predict_type].sum().item()
-            helpdic[tissue][1] += (~gt_type[predict_type]).sum().item()
-            helpdic[tissue][2] += (~predict_type[gt_type]).sum().item()
+        scores = F.sigmoid(scores)
+        # assert torch.all(scores>=0)
+        # assert torch.all(scores<=1)
+        remember_all_predict.append(scores.detach())
+        remember_all_label.append(onehot_label.detach())
 
-    print("accuracy: ", correct / count)
+    # iter through validdataloader, start grid search
+
+    # stack the list first
+    remember_all_predict = torch.cat(remember_all_predict, dim=0)
+    remember_all_label = torch.cat(remember_all_label, dim=0)
+    count = len(remember_all_label)
+    assert count > 4900, "error: tensor size not equal to dataset size!"
+
+    best_threshold = 0
+    best_f1mean = 0
+    follow_accuracy = 0
+
+    # for threshold in tqdm(np.arange(0, 1, step = 0.01)):
+        # calculate accuracy
+    threshold = torch.tensor([0.01, 0.03, 0.30]).cuda()
+    correct = 0
+    predict = remember_all_predict >= threshold
+    for k in range(len(predict)):
+        if torch.equal(remember_all_label[k], predict[k]):
+            correct += 1
+    accuracy = correct / count
+
+        # Calculate for the three statistics
+    temp_f1 = []
+    for index, tissue in enumerate(["tumor", "stroma", "normal"]):
+        predict_type = predict[:, index].bool()
+        gt_type = remember_all_label[:, index].bool()
+        helpdic[tissue][0] = gt_type[predict_type].sum().item()
+        helpdic[tissue][1] = (~gt_type[predict_type]).sum().item()
+        helpdic[tissue][2] = (~predict_type[gt_type]).sum().item()
+        precision = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1])
+        recall = helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2])
+        f1_score = 2 * precision * recall / (precision + recall)
+        temp_f1.append(f1_score)
+    
+    current_f1mean = sum(temp_f1) / len(temp_f1)
+    # if current_f1mean > best_f1mean:
+    #     best_f1mean = current_f1mean
+    #     best_threshold = threshold
+    #     follow_accuracy = accuracy
+            
+    print("validation accuracy: ", accuracy)
+    # print("validation threshold: ", best_threshold)
+    # print("validation f1 mean: ", best_f1mean)
+    print("validation f1 mean: ", current_f1mean)
+
     for tissue in ["tumor", "stroma", "normal"]:
         print("precision for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1]))
         print("recall for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2]))
+        # print("fi_score for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2]))
 
