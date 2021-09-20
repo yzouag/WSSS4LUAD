@@ -15,17 +15,16 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=32, type=int)
-parser.add_argument("-epoch", default=100, type=int)
+parser.add_argument("-epoch", default=40, type=int)
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-t', type=float, default = 0.9, required=False, help='the threshold probability to set the label of the image to 1')
-# parser.add_argument("-v", action='store_true', help='whether it is to validate')
 args = parser.parse_args()
 
 batch_size = args.batch
 devices = args.device
 threshold = args.t
 epochs = args.epoch
-base_lr = 0.0001
+base_lr = 0.0003
 net = network.ResNet().cuda()
 
 # Get pretrained model
@@ -49,10 +48,15 @@ TrainDataset = dataset.OriginPatchesDataset(transform=transforms.Compose([
 
 print("Dataset", len(TrainDataset))
 
+validDataset = dataset.OriginVaidationDataset(transform=transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
-optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.955)
+optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=2e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
@@ -87,7 +91,7 @@ for i in range(epochs):
 
         optimizer.step()
         running_loss += loss.item()
-        scores = F.sigmoid(scores)
+        scores = torch.sigmoid(scores)
         predict = scores.detach() >= threshold # check dtype here
         for k in range(len(onehot_label)):
             if torch.equal(onehot_label[k], predict[k]):
@@ -109,16 +113,10 @@ for i in range(epochs):
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
     if (i + 1) % 10 == 0 and (i + 1) != epochs:
-        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch_model_ep"+str(i+1)+".pth")
-
-    # Cause we use random choice, the dataset changes for each iteration, but it doesn't matter
-    validDataset = dataset.OriginVaidationDataset(transform=transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_ep"+str(i+1)+".pth")
 
     print("Dataset", len(validDataset))
-    ValidDataloader = DataLoader(validDataset, batch_size=20, num_workers=2, drop_last=False)
+    ValidDataloader = DataLoader(validDataset, batch_size=24, num_workers=2, drop_last=False)
     net.eval()
 
     with torch.no_grad():
@@ -132,9 +130,7 @@ for i in range(epochs):
             
             scores = net(img) # probability of n * 3
             onehot_label = label.cuda() # gt label of n * 3
-            scores = F.sigmoid(scores)
-            # assert torch.all(scores>=0)
-            # assert torch.all(scores<=1)
+            scores = torch.sigmoid(scores)
             remember_all_predict.append(scores.detach())
             remember_all_label.append(onehot_label.detach())
 
@@ -144,19 +140,11 @@ for i in range(epochs):
     remember_all_predict = torch.cat(remember_all_predict, dim=0)
     remember_all_label = torch.cat(remember_all_label, dim=0)
     count = len(remember_all_label)
-    assert count == 200, "error: tensor size not equal to dataset size!"
 
     for threshold in tqdm(np.arange(0, 1, step = 0.01)):
-        # calculate accuracy
-        # correct = 0
         predict = remember_all_predict >= threshold
-        # for k in range(len(predict)):
-        #     if torch.equal(remember_all_label[k], predict[k]):
-        #         correct += 1
-        # accuracy = correct / count
 
         # Calculate for the three statistics
-        # temp_f1 = np.zeros(3)
         for index, tissue in enumerate(["tumor", "stroma", "normal"]):
             predict_type = predict[:, index].bool()
             gt_type = remember_all_label[:, index].bool()
@@ -169,61 +157,57 @@ for i in range(epochs):
             if f1_score > helpdic[tissue][3]:
                 helpdic[tissue][3] = f1_score
                 helpdic[tissue][4] = threshold
-                # temp_f1[index] = f1_score
             
-        
-        # current_f1mean = sum(temp_f1) / len(temp_f1)
-        # if current_f1mean > best_f1mean:
-        #     best_f1mean = current_f1mean
-        #     best_threshold = threshold
-        #     follow_accuracy = accuracy
 
     current_f1mean =  (helpdic["tumor"][3] + helpdic["stroma"][3] + helpdic["normal"][3]) / 3
     current_t =  np.array([helpdic["tumor"][4], helpdic["stroma"][4], helpdic["normal"][4]])
     if current_f1mean > best_f1mean:
-        print("updating..........................................")
+        print("updating............................................................................................")
         best_f1mean = current_f1mean
         best_threshold = np.array([helpdic["tumor"][4], helpdic["stroma"][4], helpdic["normal"][4]])
         # follow_accuracy = accuracy
-        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch_model_best.pth")
-    # print("validation accuracy: ", follow_accuracy)
-    print("validation threshold: ", best_threshold)
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_best.pth")
+    
+    correct = 0
+    temp = remember_all_predict >= torch.from_numpy(current_t).cuda()
+    for k in range(len(temp)):
+        if torch.equal(remember_all_label[k], temp[k]):
+            correct += 1
+    accuracy = correct / count
+    
+    print("validation current accuracy: ", accuracy)
+    print("validation best threshold: ", best_threshold)
     print("validation best f1 mean: ", best_f1mean)
     print("validation current f1 mean: ", current_f1mean)
     print("validation current threshold: ", current_t)
-    # valid_accuracy.append(follow_accuracy)
+    valid_accuracy.append(accuracy)
 
-    # for tissue in ["tumor", "stroma", "normal"]:
-    #     print("validation precision for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1]))
-    #     print("validation recall for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2]))
-
-    # threshold_list.append(best_threshold)
     f1_scores.append(current_f1mean)
 
 fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch_loss.png')
-torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch_model_last.pth")
+plt.savefig('./image/bigpatch6000_loss.png')
+torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch_accuracy.png')
+plt.savefig('./image/bigpatch6000_accuracy.png')
 
-# fig=plt.figure()
-# plt.plot(valid_accuracy)
-# plt.ylabel('validation accuracy')
-# plt.xlabel('epochs')
-# plt.savefig('./image/bigpatch_validaccuracy.png')
+fig=plt.figure()
+plt.plot(valid_accuracy)
+plt.ylabel('validation accuracy')
+plt.xlabel('epochs')
+plt.savefig('./image/bigpatch6000_validaccuracy.png')
 
 fig=plt.figure()
 plt.plot(f1_scores)
 plt.ylabel('validation mean f1 scores')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch_f1mean.png')
+plt.savefig('./image/bigpatch6000_f1mean.png')
 
 # fig=plt.figure()
 # plt.plot(threshold_list)
