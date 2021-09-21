@@ -7,6 +7,7 @@ import argparse
 from multiprocessing import Manager, Pool
 import shutil
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 import torch
 import network
 from torchvision import transforms
@@ -16,19 +17,16 @@ from matplotlib import pyplot as plt
 import json
 
 def crop_train_image(file_info):
-    imfile, count, threshold, labels = file_info
-    full_path = dataset_path + imfile
-    im = Image.open(full_path)
+    imfile, count, threshold, labels, cut_result_path, patch_shape, stride = file_info
+    im = Image.open(imfile)
     im_arr = np.asarray(im)
     patches = patchify(im_arr, (patch_shape, patch_shape, 3), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i, j, 0, :, :, :]
             if is_valid_crop(sub_image, threshold):
-
                 result = Image.fromarray(np.uint8(sub_image))
-                result.save(cut_result_path + str(count) +
-                            "_" + str(i) + str(j) + str(labels) +'.png')
+                result.save(os.path.join(cut_result_path, str(count) + "_" + str(i) + str(j) + str(labels) +'.png'))
 
 
 def crop_valid_image(origin_im, mask_im, index, threshold, cut_result_path):
@@ -80,7 +78,7 @@ def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=6
         processes = []
         for i in range(num_workers):
             p = Process(target=predict_image_score, args=(
-                L, image_chunks[i], test_path, batch_size, True))
+                L, image_chunks[i], test_path, batch_size, False))
             p.start()
             processes.append(p)
         for p in processes:
@@ -92,14 +90,14 @@ def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=6
 
 def test_crop_accuracy(score_path, big_labels_path):
     scores = np.load(score_path, allow_pickle=True)
-    big_labels = np.load(big_labels_path, allow_pickle=True)
+    # big_labels = np.load(big_labels_path, allow_pickle=True)
     gt = []
     pred = []
     for i in range(len(scores)):
         pred.append(scores[i][1])
         label = scores[i][0][-13:-4]
         gt.append([int(label[1]), int(label[4]), int(label[7])])
-    pred = np.stack(pred) * big_labels
+    pred = np.stack(pred)
     gt = np.stack(gt)
 
     # get big image label, exclude impossible labels
@@ -109,13 +107,11 @@ def test_crop_accuracy(score_path, big_labels_path):
     #   if images predict 1 and correct / images predict 1 > 0.95, the threshold is confident enough
     #   same for lower bound
     # record lower and upper bound
-    
-
     threshold = {}
     for i in range(3):
         lower = 0
         upper = 0
-        min_amount = 500
+        min_amount = 5000
         best_lower_score = 0
         best_higher_score = 0
         for lower_bound in np.arange(0,1,0.01):
@@ -173,7 +169,7 @@ def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
     for image_batch in tqdm(image_batches):
         img_list = []
         for i in range(len(image_batch)):
-            sub_image = Image.open(valid + image_batch[i])
+            sub_image = Image.open(os.path.join(valid, image_batch[i]))
             transform = transforms.Compose([
                 transforms.Resize((224,224)),
                 transforms.ToTensor(),
@@ -199,6 +195,31 @@ def chunks(lst, num_workers, n):
             chunk_list.append(lst[i:i + n])
         return chunk_list
 
+def get_crop_label(score_path, threshold, save_folder):
+    scores = np.load(score_path, allow_pickle=True)
+    big_labels = []
+    pred = []
+    for i in range(len(scores)):
+        pred.append(scores[i][1])
+        label = scores[i][0][-13:-4]
+        big_labels.append([int(label[1]), int(label[4]), int(label[7])])
+    pred = np.stack(pred)
+    big_labels = np.stack(big_labels)
+    for i in range(3):
+        pred[:, i][pred[:, i] <= threshold[i]['lower bound']] = 0
+        pred[:, i][pred[:, i] >= threshold[i]['higher bound']] = 1
+        pred[:, i][np.logical_and(pred[:,i] > threshold[i]['lower bound'], pred[:, i] < threshold[i]['higher bound'])] = -1
+    pred = pred * big_labels
+    indicies = np.where(np.all(pred!=-1, axis=1))
+    image_name = scores[indicies][0]
+    image_label = pred[indicies, :]
+    if not os.path.exists(save_folder):
+        os.mkdir(save_folder)
+    for i in range(len(image_name)):
+        image = Image.open(cut_result_path,image_name[i])
+        image.save(f'{save_folder}/{image_name[i][:-13]}{image_label[i]}.png')
+    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -212,9 +233,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        # valid = 'valid_single_patches/'
-        # generate_image_label_score(valid, 'validation_96_32_new', num_workers=1, batch_size=64)
-        print(json.dumps(test_crop_accuracy('image_label_score/validation_96_32_new.npy', 'src/val_labels.npy'), indent=4))
+        save_name = 'val_96_32_old'
+        valid = 'valid_single_patches/'
+        generate_image_label_score(valid, save_name, num_workers=1, batch_size=64)
+        # prediction_threshold = test_crop_accuracy('image_label_score/validation_96_32_new.npy', 'src/val_labels.npy')
+        # print(json.dumps(prediction_threshold, indent=4))
+        # with open('prediction_threshold.json', 'w') as fp:
+        #     json.dump(prediction_threshold, fp)
         exit()
 
     threshold = args.t
@@ -235,19 +260,22 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    else:
-        shutil.rmtree(cut_result_path)
-        os.mkdir(cut_result_path)
+    # else:
+    #     shutil.rmtree(cut_result_path)
+    #     os.mkdir(cut_result_path)
 
     if dataset == 1:
-        p = Pool(processes=6)
-        file_list = []
-        count = 0
-        for file in os.listdir(dataset):
-            label = file.split('-')[-1][:-4]
-            labels = [int(label[1]), int(label[4]), int(label[7])]
-            file_list.append((file, count, threshold, labels))
-        tqdm.tqdm(p.imap(crop_train_image, file_list), total=len(file_list))
+        # file_list = []
+        # for file in os.listdir(dataset_path):
+        #     label = file.split('-')[-1][:-4]
+        #     labels = [int(label[1]), int(label[4]), int(label[7])]
+        #     file_list.append((os.path.join(dataset_path, file), file[:-14], threshold, labels, cut_result_path, patch_shape, stride))
+        # process_map(crop_train_image, file_list, max_workers=6)
+        
+        save_score_name = 'training'
+        generate_image_label_score(cut_result_path, save_score_name, num_workers=1, batch_size=64)
+        prediction_threshold = json.load('prediction_threshold.json')
+        get_crop_label(f'image_label_score/{save_score_name}.npy', prediction_threshold, 'new_train')
 
     if dataset == 2:
         image_names = os.listdir(valid_mask_path)
