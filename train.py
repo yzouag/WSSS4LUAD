@@ -1,5 +1,5 @@
 import os
-# os.environ['CUDA_VISIBLE_DEVICES']='2'
+os.environ['CUDA_VISIBLE_DEVICES']='2,3'
 import torch
 import network
 import dataset
@@ -22,7 +22,7 @@ def convertinttoonehot(nums_list):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch", default=50, type=int)
+parser.add_argument("--batch", default=64, type=int)
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-setting', type=str, help='the stride and pathsize setting', required=True)
 parser.add_argument("-bce", action='store_true', help='whether to use bce loss')
@@ -30,10 +30,10 @@ args = parser.parse_args()
 
 batch_size = args.batch
 devices = args.device
-print(devices)
+# print(devices)
 setting_str = args.setting
 use_bce = args.bce
-base_lr = 0.0003
+base_lr = 0.001
 net = network.ResNet().cuda()
 assert os.path.exists("./train_single_patches"), "The directory train_single_patches haven't been genereated!"
 
@@ -60,8 +60,8 @@ TrainDataset = dataset.SingleLabelDataset("train_single_patches/", transform=tra
 print("Dataset", len(TrainDataset))
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
-optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
+optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 if not use_bce:
     criteria = torch.nn.CrossEntropyLoss(reduction='mean')
 else:
@@ -69,7 +69,7 @@ else:
 
 criteria.cuda()
 
-epochs = 15
+epochs = 20
 loss_g = []
 accuracy_g = []
 
@@ -107,17 +107,17 @@ for i in range(epochs):
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
     if (i + 1) % 5 == 0 and (i + 1) != epochs:
-        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/ce_" + setting_str + "_model_ep"+str(i+1)+".pth")
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
 
 fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/ce_' + setting_str + '_loss.png')
-torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/ce_" + setting_str + "_model_last.pth")
+plt.savefig('./image/loss.png')
+torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/ce_' + setting_str + '_accuracy.png')
+plt.savefig('./image/accuracy.png')

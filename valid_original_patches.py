@@ -13,13 +13,16 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=20, type=int)
-parser.add_argument('-t', type=float, default = 0.8, required=False, help='the threshold probability to set the label of the image to 1')
+# parser.add_argument('-t', type=float, default = 0.8, required=False, help='the threshold probability to set the label of the image to 1')
+parser.add_argument('-m', type=str, required=True, help='model index')
+parser.add_argument('-t', nargs='+', help='threshold set', required=True, type=float)
 args = parser.parse_args()
 
 batch_size = args.batch
 threshold = args.t
+model_index = args.m
 net = network.ResNet()
-path = "./modelstates/bigpatch6000_model_last.pth"
+path = "./modelstates/" + model_index + ".pth"
 pretrained = torch.load(path)['model']
 pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained_modify)
@@ -58,7 +61,7 @@ with torch.no_grad():
     remember_all_predict = torch.cat(remember_all_predict, dim=0)
     remember_all_label = torch.cat(remember_all_label, dim=0)
     count = len(remember_all_label)
-    assert count > 4900, "error: tensor size not equal to dataset size!"
+    # assert count > 4900, "error: tensor size not equal to dataset size!"
 
     best_threshold = 0
     best_f1mean = 0
@@ -66,7 +69,7 @@ with torch.no_grad():
 
     # for threshold in tqdm(np.arange(0, 1, step = 0.01)):
         # calculate accuracy
-    threshold = torch.tensor([0.01, 0.03, 0.30]).cuda()
+    threshold = torch.tensor(threshold).cuda()
     correct = 0
     predict = remember_all_predict >= threshold
     for k in range(len(predict)):

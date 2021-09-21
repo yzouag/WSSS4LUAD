@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0, 2'
+os.environ['CUDA_VISIBLE_DEVICES']='2, 3'
 import torch
 import network
 import dataset
@@ -14,41 +14,45 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch", default=50, type=int)
+parser.add_argument("--batch", default=32, type=int)
 args = parser.parse_args()
 
 batch_size = args.batch
 net = network.ResNet()
-path = "./model.pth"
-pretrained = torch.load(path)
-pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
-net.load_state_dict(pretrained_modify)
-print(f'Model loaded from {path}')
-net.cuda()
-net.eval()
 
-validDataset = dataset.SingleLabelDataset("valid_single_patches/", transform=transforms.Compose([
-    transforms.Resize(256),
-    transforms.RandomCrop(224),
-    # transforms.Resize(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
+for m in ["9632_ep5", "9632_ep10", "9632_ep15"]:
 
-print("Dataset", len(validDataset))
-ValidDataloader = DataLoader(validDataset, batch_size=batch_size, num_workers=2, drop_last=True)
+    path = "./modelstates/" + m + ".pth"
+    pretrained = torch.load(path)['model']
+    pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
+    # pretrained_modify = {k : v for k, v in pretrained.items()}
+    net.load_state_dict(pretrained_modify)
+    print(f'Model loaded from {path}')
+    net.cuda()
+    net.eval()
 
-correct = 0
-count = 0
+    validDataset = dataset.SingleLabelDataset("valid_single_patches/", transform=transforms.Compose([
+        # transforms.Resize(256),
+        # transforms.RandomCrop(224),
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
-with torch.no_grad():
+    print("Dataset", len(validDataset))
+    ValidDataloader = DataLoader(validDataset, batch_size=batch_size, num_workers=2, drop_last=True)
 
-    for inputs, labels in tqdm(ValidDataloader):
-        labels = labels.cuda()
-        inputs = inputs.cuda()
-        scores = net(inputs)
+    correct = 0
+    count = 0
 
-        level = scores.detach().argmax(dim = 1)
-        correct += torch.sum(level == labels).item()
-        count += batch_size
+    with torch.no_grad():
 
-print("accuracy for validation is: ", (correct / count))
+        for inputs, labels in tqdm(ValidDataloader):
+            labels = labels.cuda()
+            inputs = inputs.cuda()
+            scores = net(inputs)
+
+            level = scores.detach().argmax(dim = 1)
+            correct += torch.sum(level == labels).item()
+            count += batch_size
+
+    print("accuracy for validation is: ", (correct / count))

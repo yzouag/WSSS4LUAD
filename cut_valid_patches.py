@@ -20,7 +20,7 @@ def crop_image(origin_im, mask_im, count, threshold):
             result = Image.fromarray(np.uint8(sub_image))
             result.save("./valid_single_patches/image" + str(count) + "_" + str(i) + str(j) + '_' + str(im_type) + '.png')
 
-def checkProportion(im_arr, threshold = 0.7):
+def checkProportion(im_arr, threshold = 0.5):
     im_arr = list(im_arr.reshape(-1))
     count = Counter(im_arr)
     imtype, counts = count.most_common(1)[0]
@@ -31,9 +31,9 @@ def checkProportion(im_arr, threshold = 0.7):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "-threshold", type=float, default=0.7, required=False, help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=56, type=int)
-    parser.add_argument("-stride", default=28, type=int)
+    parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False, help="The threshold to use to eliminate images with white proportions")
+    parser.add_argument("-shape", default=96, type=int)
+    parser.add_argument("-stride", default=32, type=int)
     args = parser.parse_args()
     threshold = args.t
     patch_shape = args.shape

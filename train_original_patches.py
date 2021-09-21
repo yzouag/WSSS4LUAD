@@ -1,6 +1,6 @@
 import os
 from threading import current_thread
-# os.environ['CUDA_VISIBLE_DEVICES']='2'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset
@@ -15,7 +15,8 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=32, type=int)
-parser.add_argument("-epoch", default=40, type=int)
+parser.add_argument("-epoch", default=45, type=int)
+parser.add_argument("-m", required=True, type=str, help="The model index to use.")
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-t', type=float, default = 0.9, required=False, help='the threshold probability to set the label of the image to 1')
 args = parser.parse_args()
@@ -24,7 +25,8 @@ batch_size = args.batch
 devices = args.device
 threshold = args.t
 epochs = args.epoch
-base_lr = 0.0003
+model_index = args.m
+base_lr = 0.0005
 net = network.ResNet().cuda()
 
 # Get pretrained model
@@ -55,8 +57,9 @@ validDataset = dataset.OriginVaidationDataset(transform=transforms.Compose([
 
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
-optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=2e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
+# optimizer = torch.optim.Adam(net.parameters(), base_lr, weight_decay=1e-4)
+optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
@@ -113,7 +116,7 @@ for i in range(epochs):
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
     if (i + 1) % 10 == 0 and (i + 1) != epochs:
-        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_ep"+str(i+1)+".pth")
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + model_index + "_ep"+str(i+1)+".pth")
 
     print("Dataset", len(validDataset))
     ValidDataloader = DataLoader(validDataset, batch_size=24, num_workers=2, drop_last=False)
@@ -166,7 +169,7 @@ for i in range(epochs):
         best_f1mean = current_f1mean
         best_threshold = np.array([helpdic["tumor"][4], helpdic["stroma"][4], helpdic["normal"][4]])
         # follow_accuracy = accuracy
-        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_best.pth")
+        torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/"+ model_index +"_best.pth")
     
     correct = 0
     temp = remember_all_predict >= torch.from_numpy(current_t).cuda()
@@ -188,26 +191,26 @@ fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch6000_loss.png')
-torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/bigpatch6000_model_last.pth")
+plt.savefig("./image/"+ model_index + "_loss.png")
+torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + model_index +"_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch6000_accuracy.png')
+plt.savefig('./image/' + model_index +'_accuracy.png')
 
 fig=plt.figure()
 plt.plot(valid_accuracy)
 plt.ylabel('validation accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch6000_validaccuracy.png')
+plt.savefig('./image/' + model_index + '_validaccuracy.png')
 
 fig=plt.figure()
 plt.plot(f1_scores)
 plt.ylabel('validation mean f1 scores')
 plt.xlabel('epochs')
-plt.savefig('./image/bigpatch6000_f1mean.png')
+plt.savefig('./image/' + model_index +'_f1mean.png')
 
 # fig=plt.figure()
 # plt.plot(threshold_list)
