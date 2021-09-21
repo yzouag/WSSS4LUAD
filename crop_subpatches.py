@@ -7,66 +7,42 @@ import argparse
 from multiprocessing import Manager, Pool
 import shutil
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 import torch
 import network
 from torchvision import transforms
 from math import ceil
 from sklearn.metrics import f1_score
+from matplotlib import pyplot as plt
+import json
+
 
 def crop_train_image(file_info):
-    imfile, count, threshold = file_info
-    full_path = dataset_path + imfile
-    im = Image.open(full_path)
+    imfile, count, threshold, labels, cut_result_path, patch_shape, stride = file_info
+    im = Image.open(imfile)
     im_arr = np.asarray(im)
     patches = patchify(im_arr, (patch_shape, patch_shape, 3), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i, j, 0, :, :, :]
-            if is_valid_crop(sub_image, threshold):
-                im_type = get_label_from_nn(sub_image)
-                result = Image.fromarray(np.uint8(patches[i, j, 0, :, :, :]))
-                result.save(cut_result_path + str(count) +
-                            "_" + str(i) + str(j) + '_' + str(im_type) + '.png')
+            if is_valid_crop(sub_image, threshold, groundtruth=False):
+                result = Image.fromarray(np.uint8(sub_image))
+                result.save(os.path.join(cut_result_path, str(
+                    count) + "_" + str(i) + str(j) + str(labels) + '.png'))
 
 
-# # todo: add consideration for the whole image, need to run paralelly and add a gridsearch for threshold
-# # change the output to sigmoid
-# def get_label_from_nn(sub_image, f, upper=1, lower=-1):
-#     im_type = [0, 0, 0]
-#     transform = transforms.Compose([
-#         transforms.ToPILImage(),
-#         transforms.Resize(224),
-#         transforms.ToTensor(),
-#         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-#     image = transform(sub_image)
-#     image = image.reshape((1, 3, 224, 224))
-#     with torch.no_grad():
-#         input = image.cuda()
-#         score = torch.sigmoid(net(input))
-#         result = score.cpu().numpy().reshape(-1)
-#     f.write(str(result) + '\n')
-#     for i in range(3):
-#         if result[i] > upper:
-#             im_type[i] = 1
-#         elif result[i] < lower:
-#             im_type[i] = 0
-#         else:
-#             im_type[i] = -1
-#     return im_type
-
-
-def crop_valid_image(origin_im, mask_im, count, threshold, cut_result_path):
+def crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_result_path):
     stack_image = np.concatenate((origin_im, mask_im.reshape(
         mask_im.shape[0], mask_im.shape[1], 1)), axis=2)
     patches = patchify(stack_image, (patch_shape, patch_shape, 4), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i, j, 0, :, :, :3]
-            if is_valid_crop(sub_image, groundtruth=True):
+            if is_valid_crop(sub_image, white_threshold, groundtruth=True):
                 label = patches[i, j, 0, :, :, 3]
                 im_type = get_labels(label, threshold)
                 result = Image.fromarray(np.uint8(sub_image))
-                result.save(cut_result_path + '/image' + str(count) +
+                result.save(cut_result_path + '/image' + index +
                             '_' + str(i) + str(j) + '_' + str(im_type) + '.png')
 
 
@@ -95,15 +71,16 @@ def get_labels(label, threshold=0.3):
     return im_type[:3]
 
 
-def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=64):
+def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=64, is_new=True):
     files = os.listdir(test_path)
     image_chunks = chunks(files, num_workers, -1)
-    
+
     with Manager() as manager:
         L = manager.list()
         processes = []
         for i in range(num_workers):
-            p = Process(target=predict_image_score, args=(L,image_chunks[i], test_path, batch_size))
+            p = Process(target=predict_image_score, args=(
+                L, image_chunks[i], test_path, batch_size, is_new))
             p.start()
             processes.append(p)
         for p in processes:
@@ -112,8 +89,10 @@ def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=6
             os.mkdir('image_label_score')
         np.save(f'image_label_score/{save_name}.npy', list(L))
 
-def test_crop_accuracy(score_path):
+
+def test_crop_accuracy(score_path, big_labels_path, min_amount):
     scores = np.load(score_path, allow_pickle=True)
+    # big_labels = np.load(big_labels_path, allow_pickle=True)
     gt = []
     pred = []
     for i in range(len(scores)):
@@ -123,31 +102,66 @@ def test_crop_accuracy(score_path):
     pred = np.stack(pred)
     gt = np.stack(gt)
 
-    best_f1_score = 0
-    for lower_bound in np.arange(0,0.5,0.02):
-        for upper_bound in np.arange(0.5,1,0.02):
-            for i in range(3):
-                pred[:,i][pred[:,i] < lower_bound] = 0
-                pred[:,i][pred[:,i] > upper_bound] = 1
-                pred[:,i][np.logical_and(pred[:,i] >= lower_bound,pred[:,i] <= upper_bound)] = -1
-            print(pred.transpose().shape)
-            print(gt.shape)
-            score = f1_score(gt.transpose(), pred.transpose(), average='macro')
-            if score > best_f1_score:
-                best_f1_score = score
-                threshold = (lower_bound, upper_bound)
-    return best_f1_score, threshold
-            
+    # get big image label, exclude impossible labels
+    # for each label:
+    #   get all images > upper, mark as 1, and their true label
+    #   get all images < lower, mark as 0, and their true label
+    #   if images predict 1 and correct / images predict 1 > 0.95, the threshold is confident enough
+    #   same for lower bound
+    # record lower and upper bound
+    threshold = {}
+    for i in range(3):
+        lower = 0
+        upper = 0
+        # min_amount = 100
+        best_lower_score = 0
+        best_higher_score = 0
+        for lower_bound in np.arange(0, 1, 0.001):
+            true_zero = gt[:, i][pred[:, i] <= lower_bound] == 0
+            if len(true_zero) < 1:
+                continue
+
+            score = sum(true_zero) / len(true_zero)
+            if score > best_lower_score and len(true_zero) > min_amount:
+                lower = lower_bound
+                best_lower_score = score
+
+        for upper_bound in np.arange(0, 1, 0.001):
+            true_one = gt[:, i][pred[:, i] >= upper_bound] == 1
+            if len(true_one) < 1:
+                continue
+
+            score = sum(true_one) / len(true_one)
+            if score > best_higher_score and len(true_one) > min_amount:
+                upper = upper_bound
+                best_higher_score = score
+
+        threshold[i] = {
+            'lower_bound': lower,
+            'lower_accuracy': best_lower_score,
+            'upper_bound': upper,
+            'upper_accuracy': best_higher_score
+        }
+    return threshold
+
 
 def make_chunk(target_list, n):
     for i in range(0, len(target_list), n):
         yield target_list[i:i + n]
 
-def predict_image_score(l, image_list, valid, batch_size=64):
-    model_path = 'modelstates/model_last.pth'
-    model_param = torch.load(model_path)['model']
-    net = network.ResNet()
-    net.load_state_dict(model_param)
+
+def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
+    if is_new:
+        net = network.ResNet()
+        model_path = 'modelstates/01_best.pth'
+        pretrained = torch.load(model_path)['model']
+        pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
+        net.load_state_dict(pretrained_modify)
+    else:
+        model_path = 'modelstates/model_last.pth'
+        model_param = torch.load(model_path)['model']
+        net = network.ResNet()
+        net.load_state_dict(model_param)
     print(f'Model loaded from {model_path}')
     net.cuda()
     net.eval()
@@ -156,10 +170,9 @@ def predict_image_score(l, image_list, valid, batch_size=64):
     for image_batch in tqdm(image_batches):
         img_list = []
         for i in range(len(image_batch)):
-            sub_image = np.asarray(Image.open(valid + image_batch[i]))
+            sub_image = Image.open(os.path.join(valid, image_batch[i]))
             transform = transforms.Compose([
-                transforms.ToPILImage(),
-                transforms.Resize(224),
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
             image = transform(sub_image)
@@ -169,6 +182,7 @@ def predict_image_score(l, image_list, valid, batch_size=64):
             score = torch.sigmoid(net(image))
             score = score.cpu().numpy().reshape(len(image_batch), 3)
         l.extend(list(zip(image_batch, score)))
+
 
 def chunks(lst, num_workers, n):
     chunk_list = []
@@ -182,24 +196,60 @@ def chunks(lst, num_workers, n):
             chunk_list.append(lst[i:i + n])
         return chunk_list
 
+
+def get_crop_label(score_path, threshold, save_folder):
+    scores = np.load(score_path, allow_pickle=True)
+    big_labels = []
+    pred = []
+    for i in range(len(scores)):
+        pred.append(scores[i][1])
+        label = scores[i][0][-13:-4]
+        big_labels.append([int(label[1]), int(label[4]), int(label[7])])
+    pred = np.stack(pred)
+    big_labels = np.stack(big_labels)
+    for i in range(3):
+        pred[:, i][pred[:, i] <= threshold[str(i)]['lower_bound']] = 0
+        pred[:, i][pred[:, i] >= threshold[str(i)]['upper_bound']] = 1
+        pred[:, i][np.logical_and(
+            pred[:, i] > threshold[str(i)]['lower_bound'], pred[:, i] < threshold[str(i)]['upper_bound'])] = -1
+    pred = pred * big_labels
+    indicies = np.where(np.all(pred != -1, axis=1))
+    image_name = scores[indicies][:, 0]
+    image_label = pred[indicies, :].astype(np.int8).reshape(-1, 3)
+    if not os.path.exists(save_folder):
+        os.mkdir(save_folder)
+    for i in tqdm(range(len(image_name))):
+        image = Image.open(os.path.join(cut_result_path, image_name[i]))
+        image.save(f'{save_folder}/{image_name[i][:-13]}{image_label[i]}.png')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False,
+    parser.add_argument("-t", "-threshold", type=float, default=0.05, required=False,
+                        help="The threshold to infer a crop has certain type of cells")
+    parser.add_argument("-w", "--white", type=float, default=0.5, required=False,
                         help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=56, type=int)
-    parser.add_argument("-stride", default=28, type=int)
+    parser.add_argument("-shape", default=96, type=int)
+    parser.add_argument("-stride", default=48, type=int)
     parser.add_argument("-d", "--dataset", default=1, type=int,
                         help="the crop dataset, 1.training, 2.validation, 3.testing", choices=[1, 2, 3])
     parser.add_argument("-test", action='store_true', help='take the test')
     args = parser.parse_args()
 
     if args.test:
-        # valid = 'valid_single_patches/'
-        # generate_image_label_score(valid, 'validation', num_workers=1)
-        print(test_crop_accuracy('image_label_score/validation.npy'))
+        save_name = 'val_96_32_new'
+        valid = 'valid_single_patches/'
+        # generate_image_label_score(
+        #     valid, save_name, num_workers=1, batch_size=64, is_new=True)
+        prediction_threshold = test_crop_accuracy(
+            f'image_label_score/{save_name}.npy', 'src/val_labels.npy', min_amount=100)
+        print(json.dumps(prediction_threshold, indent=4))
+        with open('prediction_threshold.json', 'w') as fp:
+            json.dump(prediction_threshold, fp)
         exit()
 
     threshold = args.t
+    white_threshold = args.white
     patch_shape = args.shape
     stride = args.stride
     dataset = args.dataset
@@ -217,28 +267,35 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    else:
-        shutil.rmtree(cut_result_path)
-        os.mkdir(cut_result_path)
+    # else:
+    #     shutil.rmtree(cut_result_path)
+    #     os.mkdir(cut_result_path)
 
     if dataset == 1:
-        p = Pool(processes=6)
         file_list = []
-        count = 0
-        for file in os.listdir(dataset):
+        for file in os.listdir(dataset_path):
             label = file.split('-')[-1][:-4]
             labels = [int(label[1]), int(label[4]), int(label[7])]
-            file_list.append((file, count, threshold))
-        tqdm.tqdm(p.imap(crop_train_image, file_list), total=len(file_list))
+            if sum(labels) > 1:
+                file_list.append((os.path.join(
+                    dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
+        process_map(crop_train_image, file_list, max_workers=6)
+
+        save_score_name = 'training'
+        generate_image_label_score(
+            cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+        with open('prediction_threshold.json') as json_file:
+            prediction_threshold = json.load(json_file)
+        get_crop_label(
+            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'new_train')
 
     if dataset == 2:
         image_names = os.listdir(valid_mask_path)
-        count = 0
         for image in tqdm(image_names):
-            count += 1
             origin_image_path = os.path.join(valid_origin_path, image)
             mask_image_path = os.path.join(valid_mask_path, image)
             origin_im = np.asarray(Image.open(origin_image_path))
             mask_im = np.asarray(Image.open(mask_image_path))
-            crop_valid_image(origin_im, mask_im, count,
-                             threshold, cut_result_path)
+            index = image[:2]
+            crop_valid_image(origin_im, mask_im, index,
+                             threshold, white_threshold, cut_result_path)
