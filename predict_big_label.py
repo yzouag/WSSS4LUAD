@@ -45,7 +45,7 @@ def predict_big_label(image_path, im_size, stride, threshold, model_path):
         im_list = cut_patches(im, im_size=im_size, stride=stride, transform=transform).cuda()
         label = [0, 0, 0]
         total_scores = []
-        for ims in torch.split(im_list, 48):
+        for ims in torch.split(im_list, 16):
             with torch.no_grad():
                 scores = torch.sigmoid(net(ims))
                 total_scores.append(scores.cpu().numpy())
@@ -58,10 +58,10 @@ def predict_big_label(image_path, im_size, stride, threshold, model_path):
 
 threshold = [0.83, 0.21, 0.96]
 validation = predict_big_label('Dataset/2.validation/img', 225, 80, threshold, 'modelstates/01_best.pth')
-images = os.listdir('../Dataset/2.validation/mask')
+images = os.listdir('/Dataset/2.validation/mask')
 gt = []
 for image in images:
-    image_path = os.path.join('../Dataset/2.validation/mask', image)
+    image_path = os.path.join('/Dataset/2.validation/mask', image)
     im = np.asarray(Image.open(image_path))
     label = [0,0,0]
     im_label = np.unique(im)
@@ -77,8 +77,8 @@ res = {
 with open('result.json', 'w') as fp:
     json.dump(res, fp)
 
-
-
-    
-
-
+count = 0
+for i in range(len(validation)):
+    if validation[i] == gt[i]:
+        count += 1
+print(f'accuracy: {count/len(validation)}')
