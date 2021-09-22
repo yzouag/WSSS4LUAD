@@ -1,5 +1,6 @@
 from multiprocessing.context import Process
 import os
+os.environ['CUDA_VISIBLE_DEVICES']='2, 3'
 import numpy as np
 from PIL import Image
 from patchify import patchify
@@ -18,6 +19,7 @@ import json
 
 
 def crop_train_image(file_info):
+    """This function crop the training images and save sub images in the `cut_result_path` folder."""
     imfile, count, threshold, labels, cut_result_path, patch_shape, stride = file_info
     im = Image.open(imfile)
     im_arr = np.asarray(im)
@@ -32,14 +34,15 @@ def crop_train_image(file_info):
 
 
 def crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_result_path):
+    """This function crop the validation images and save the sub images in the `cut_result_path` folder."""
     stack_image = np.concatenate((origin_im, mask_im.reshape(
         mask_im.shape[0], mask_im.shape[1], 1)), axis=2)
     patches = patchify(stack_image, (patch_shape, patch_shape, 4), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             sub_image = patches[i, j, 0, :, :, :3]
-            if is_valid_crop(sub_image, white_threshold, groundtruth=True):
-                label = patches[i, j, 0, :, :, 3]
+            label = patches[i, j, 0, :, :, 3]
+            if is_valid_crop(label, white_threshold, groundtruth=True):
                 im_type = get_labels(label, threshold)
                 result = Image.fromarray(np.uint8(sub_image))
                 result.save(cut_result_path + '/image' + index +
@@ -47,6 +50,11 @@ def crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_
 
 
 def is_valid_crop(im_arr, threshold=0.5, groundtruth=True):
+    """
+    This function check whether the cropped sub images are valid for both the training and validation set.
+    All pixels with sum value over 600 are considered as white and we remove all subcrops with white porpotion
+    greater than the given threshold.
+    """
     WHITE = 600
     if groundtruth:
         count = np.sum(im_arr == 3)
@@ -62,7 +70,10 @@ def is_valid_crop(im_arr, threshold=0.5, groundtruth=True):
             return True
 
 
-def get_labels(label, threshold=0.3):
+def get_labels(label, threshold):
+    """
+    This function generates the one-hot label for the given 2D groundtruth by the given activation threshold.
+    """
     pix_type, pix_count = np.unique(label, return_counts=True)
     im_type = [0, 0, 0, 0]
     for i in range(len(pix_type)):
@@ -72,6 +83,9 @@ def get_labels(label, threshold=0.3):
 
 
 def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=64, is_new=True):
+    """
+    Mainly the multi-process managements, the key function is predict_image_score.
+    """
     files = os.listdir(test_path)
     image_chunks = chunks(files, num_workers, -1)
 
@@ -91,6 +105,9 @@ def generate_image_label_score(test_path, save_name, num_workers=3, batch_size=6
 
 
 def test_crop_accuracy(score_path, big_labels_path, min_amount):
+    """
+    Based on the image name and prediction scores, generate the best lower and upper confident threshold.
+    """
     scores = np.load(score_path, allow_pickle=True)
     # big_labels = np.load(big_labels_path, allow_pickle=True)
     gt = []
@@ -144,16 +161,18 @@ def test_crop_accuracy(score_path, big_labels_path, min_amount):
         }
     return threshold
 
-
-def make_chunk(target_list, n):
-    for i in range(0, len(target_list), n):
-        yield target_list[i:i + n]
-
+# def make_chunk(target_list, n):
+#     for i in range(0, len(target_list), n):
+#         yield target_list[i:i + n]
 
 def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
+    """
+    This function stores the image names and its corresponding scores in parameter l.
+    The is_new here means old or new model, will be replaced later.
+    """
     if is_new:
         net = network.ResNet()
-        model_path = 'modelstates/01_best.pth'
+        model_path = 'modelstates/01_best.pth'    # TODO: avoid hard code
         pretrained = torch.load(model_path)['model']
         pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
         net.load_state_dict(pretrained_modify)
@@ -185,6 +204,10 @@ def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
 
 
 def chunks(lst, num_workers, n):
+    """
+    This function splits list of files into `chunk_list` for multiprocessing. n=-1 means the step is not specified
+    and will be calculated in run time.
+    """
     chunk_list = []
     if n == -1:
         n = ceil(len(lst)/num_workers)
@@ -237,12 +260,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        save_name = 'val_96_32_new'
+        save_name = '01best'
         valid = 'valid_single_patches/'
-        # generate_image_label_score(
-        #     valid, save_name, num_workers=1, batch_size=64, is_new=True)
-        prediction_threshold = test_crop_accuracy(
-            f'image_label_score/{save_name}.npy', 'src/val_labels.npy', min_amount=100)
+        generate_image_label_score(valid, save_name, num_workers=1, batch_size=64, is_new=True)
+        prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=1000)
         print(json.dumps(prediction_threshold, indent=4))
         with open('prediction_threshold.json', 'w') as fp:
             json.dump(prediction_threshold, fp)
@@ -267,27 +288,27 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    # else:
-    #     shutil.rmtree(cut_result_path)
-    #     os.mkdir(cut_result_path)
+    else:
+        shutil.rmtree(cut_result_path)
+        os.mkdir(cut_result_path)
 
     if dataset == 1:
-        file_list = []
-        for file in os.listdir(dataset_path):
-            label = file.split('-')[-1][:-4]
-            labels = [int(label[1]), int(label[4]), int(label[7])]
-            if sum(labels) > 1:
-                file_list.append((os.path.join(
-                    dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
-        process_map(crop_train_image, file_list, max_workers=6)
+        # file_list = []
+        # for file in os.listdir(dataset_path):
+        #     label = file.split('-')[-1][:-4]
+        #     labels = [int(label[1]), int(label[4]), int(label[7])]
+        #     if sum(labels) > 1:
+        #         file_list.append((os.path.join(
+        #             dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
+        # process_map(crop_train_image, file_list, max_workers=6)
 
-        save_score_name = 'training'
-        generate_image_label_score(
-            cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+        save_score_name = 'training01best'
+        # generate_image_label_score(
+        #     cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
         with open('prediction_threshold.json') as json_file:
             prediction_threshold = json.load(json_file)
         get_crop_label(
-            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'new_train')
+            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'new_train01best')
 
     if dataset == 2:
         image_names = os.listdir(valid_mask_path)

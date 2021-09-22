@@ -1,0 +1,20 @@
+{
+    "0": {
+        "lower_bound": 0.01,
+        "lower_accuracy": 0.9866156787762906,
+        "upper_bound": 0.99,
+        "upper_accuracy": 0.9582506166155327
+    },
+    "1": {
+        "lower_bound": 0.01,
+        "lower_accuracy": 0.7932910244786945,
+        "upper_bound": 0.99,
+        "upper_accuracy": 0.9962049335863378
+    },
+    "2": {
+        "lower_bound": 0.01,
+        "lower_accuracy": 0.9962902591197796,
+        "upper_bound": 0.9390000000000001,
+        "upper_accuracy": 0.9513466550825369
+    }
+}

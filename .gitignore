@@ -1,7 +1,9 @@
 *.zip
 Dataset/
 train_single_patches/
+train_single_patches1/
 valid_single_patches/
+valid_single_patches1/
 __pycache__
 network/__pycache__/
 *.pth
@@ -14,3 +16,6 @@ heatmap/
 test_results/
 validation_results/
 *.npy
+new_train/
+new_train01best/
+image_label_score/
