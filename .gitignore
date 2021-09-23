@@ -19,3 +19,9 @@ validation_results/
 new_train/
 new_train01best/
 image_label_score/
+train_double_patches/
+train_out_cam/
+valid_double_patches/
+sample_single_patches/
+01best_train/
+9632_ep10/

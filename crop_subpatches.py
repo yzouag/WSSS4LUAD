@@ -133,7 +133,7 @@ def test_crop_accuracy(score_path, big_labels_path, min_amount):
         # min_amount = 100
         best_lower_score = 0
         best_higher_score = 0
-        for lower_bound in np.arange(0, 1, 0.001):
+        for lower_bound in np.arange(0.05, 1, 0.001):
             true_zero = gt[:, i][pred[:, i] <= lower_bound] == 0
             if len(true_zero) < 1:
                 continue
@@ -143,7 +143,7 @@ def test_crop_accuracy(score_path, big_labels_path, min_amount):
                 lower = lower_bound
                 best_lower_score = score
 
-        for upper_bound in np.arange(0, 1, 0.001):
+        for upper_bound in np.arange(0, 0.96, 0.001):
             true_one = gt[:, i][pred[:, i] >= upper_bound] == 1
             if len(true_one) < 1:
                 continue
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         save_name = '01best'
         valid = 'valid_single_patches/'
         generate_image_label_score(valid, save_name, num_workers=1, batch_size=64, is_new=True)
-        prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=1000)
+        prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=100)
         print(json.dumps(prediction_threshold, indent=4))
         with open('prediction_threshold.json', 'w') as fp:
             json.dump(prediction_threshold, fp)
@@ -288,9 +288,9 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    else:
-        shutil.rmtree(cut_result_path)
-        os.mkdir(cut_result_path)
+    # else:
+    #     shutil.rmtree(cut_result_path)
+    #     os.mkdir(cut_result_path)
 
     if dataset == 1:
         # file_list = []
@@ -302,13 +302,13 @@ if __name__ == "__main__":
         #             dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
         # process_map(crop_train_image, file_list, max_workers=6)
 
-        save_score_name = 'training01best'
-        # generate_image_label_score(
-        #     cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+        save_score_name = '01best_train'
+        generate_image_label_score(
+            cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
         with open('prediction_threshold.json') as json_file:
             prediction_threshold = json.load(json_file)
         get_crop_label(
-            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'new_train01best')
+            f'image_label_score/{save_score_name}.npy', prediction_threshold, '01best_train')
 
     if dataset == 2:
         image_names = os.listdir(valid_mask_path)

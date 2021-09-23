@@ -20,20 +20,17 @@ args = parser.parse_args()
 batch_size = args.batch
 net = network.ResNet()
 
-for m in ["9632_ep5", "9632_ep10", "9632_ep15"]:
+for m in ["secondphase_ep20"]:
 
     path = "./modelstates/" + m + ".pth"
     pretrained = torch.load(path)['model']
     pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
-    # pretrained_modify = {k : v for k, v in pretrained.items()}
     net.load_state_dict(pretrained_modify)
     print(f'Model loaded from {path}')
     net.cuda()
     net.eval()
 
-    validDataset = dataset.SingleLabelDataset("valid_single_patches/", transform=transforms.Compose([
-        # transforms.Resize(256),
-        # transforms.RandomCrop(224),
+    validDataset = dataset.DoubleValidDataset(transform=transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
@@ -51,8 +48,12 @@ for m in ["9632_ep5", "9632_ep10", "9632_ep15"]:
             inputs = inputs.cuda()
             scores = net(inputs)
 
-            level = scores.detach().argmax(dim = 1)
-            correct += torch.sum(level == labels).item()
+            scores[scores >= 0.5] = 1
+            scores[scores <= 0.5] = 0
+            # scores[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
+            for k in range(len(scores)):
+                if torch.equal(scores[k], labels[k]):
+                    correct += 1
             count += batch_size
 
     print("accuracy for validation is: ", (correct / count))

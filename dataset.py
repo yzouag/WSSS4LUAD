@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import os
 import numpy as np
 from PIL import Image
+import torch
 
 
 class SingleLabelDataset(Dataset):
@@ -21,6 +22,52 @@ class SingleLabelDataset(Dataset):
             im = self.transform(im)
         label = int(self.files[idx][-5:-4])
         return im, label
+
+class DoubleLabelDataset(Dataset):
+    def __init__(self, transform=None):
+        self.path_s = "sample_single_patches"
+        self.path_d = "train_double_patches"
+        self.files_s = os.listdir(self.path_s)
+        self.files_d = os.listdir(self.path_d)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files_s) + len(self.files_d)
+
+    def __getitem__(self, idx):
+        if idx < 15000:
+            image_path = os.path.join(self.path_s, self.files_s[idx])
+            im = Image.open(image_path)
+            if self.transform:
+                im = self.transform(im)
+            label = np.array([0,0,0])
+            activate = int(self.files_s[idx][-5])
+            label[activate] = 1
+        else:
+            idx -= 15000
+            image_path = os.path.join(self.path_d, self.files_d[idx])
+            im = Image.open(image_path)
+            if self.transform:
+                im = self.transform(im)
+            label = np.array([int(self.files_d[idx][-10]), int(self.files_d[idx][-8]), int(self.files_d[idx][-6])])
+        return im, torch.tensor(label, requires_grad=False)
+
+class DoubleValidDataset(Dataset):
+    def __init__(self, transform=None):
+        self.path_d = "valid_double_patches"
+        self.files_d = os.listdir(self.path_d)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files_d)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path_d, self.files_d[idx])
+        im = Image.open(image_path)
+        if self.transform:
+            im = self.transform(im)
+        label = np.array([int(self.files_d[idx][-10]), int(self.files_d[idx][-8]), int(self.files_d[idx][-6])])
+        return im, torch.tensor(label, requires_grad=False)
 
 class OriginPatchesDataset(Dataset):
     def __init__(self, data_path_name = "Dataset/1.training", transform=None):
@@ -151,6 +198,22 @@ class OnlineDataset(Dataset):
         # position = tuple(int(self.files[idx][-7]), int(self.files[idx][-8]))
         return image_path, im_list, position_list
 
+class OnlineTrainDataset(Dataset):
+    def __init__(self, data_path_name, transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(data_path_name)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+        if self.transform:
+            im = self.transform(im)
+
+        return image_path, im 
 
 def online_cut_patches(im, im_size=56, stride=28):
     """
