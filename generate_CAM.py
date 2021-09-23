@@ -1,6 +1,6 @@
 from math import inf
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
 import dataset
@@ -17,7 +17,7 @@ import shutil
 parser = argparse.ArgumentParser()
 parser.add_argument("-v", action='store_true', help='whether it is to generate for validation set')
 parser.add_argument("-side", default=96, type=int, required=False)
-parser.add_argument("-stride", default=48, type=int, required=False)
+parser.add_argument("-stride", default=32, type=int, required=False)
 parser.add_argument("-m", default="model_last", type=str, required=False, help="model name")
 args = parser.parse_args()
 
@@ -25,14 +25,13 @@ for_validation = args.v
 side_length = args.side
 stride = args.stride
 model_name = args.m
-# if for_validation:
-#     out_cam = "./validation_out_cam"
-#     dataset_path = "./Dataset/2.validation/img"
-# else:
-#     out_cam = "./test_out_cam"
-#     dataset_path = "./Dataset/3.testing/img"
-out_cam = "./train_out_cam"
-dataset_path = "./Dataset/1.training"
+if for_validation:
+    out_cam = "./validation_out_cam"
+    dataset_path = "./Dataset/2.validation/img"
+else:
+    out_cam = "./train_out_cam"
+    dataset_path = "./Dataset/1.training"
+
 if not os.path.exists(out_cam):
     os.mkdir(out_cam)
 else:

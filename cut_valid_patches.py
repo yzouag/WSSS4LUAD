@@ -17,6 +17,8 @@ def crop_image(origin_im, mask_im, count, threshold):
             im_type = checkProportion(label, threshold)
             if type(im_type)==int and im_type == 3:
                 continue
+            elif im_type[0] == 0 and im_type[1] == 0 and im_type[2] == 0:
+                continue
             result = Image.fromarray(np.uint8(sub_image))
             result.save("./valid_double_patches/image" + str(count) + "_" + str(i) + str(j) + '_' + str(im_type) + '.png')
 
@@ -28,7 +30,7 @@ def checkProportion(im_arr, threshold = 0.5):
         return 3
     im_type = np.array([0, 0, 0])
     for i in range(3):
-        if type_count[i] / len(im_arr) > 0.1:
+        if type_count[i] / len(im_arr) > 0.25:
             im_type[i] = 1
     return im_type
 

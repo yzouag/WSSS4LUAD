@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2,3'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2'
 import torch
 import network
 import dataset
@@ -21,7 +21,7 @@ args = parser.parse_args()
 batch_size = args.batch
 devices = args.device
 setting_str = args.setting
-base_lr = 0.0002
+base_lr = 0.0005
 net = network.ResNet()
 
 path = "modelstates/9632_ep10.pth"
@@ -91,11 +91,11 @@ fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/loss_secondphase.png')
+plt.savefig('./image/loss_secondphase2.png')
 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/accuracy_secondphase.png')
+plt.savefig('./image/accuracy_secondphase2.png')

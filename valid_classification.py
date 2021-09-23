@@ -20,7 +20,7 @@ args = parser.parse_args()
 batch_size = args.batch
 net = network.ResNet()
 
-for m in ["secondphase_ep20"]:
+for m in ["secondphase_ep10"]:
 
     path = "./modelstates/" + m + ".pth"
     pretrained = torch.load(path)['model']
@@ -37,19 +37,23 @@ for m in ["secondphase_ep20"]:
 
     print("Dataset", len(validDataset))
     ValidDataloader = DataLoader(validDataset, batch_size=batch_size, num_workers=2, drop_last=True)
-
+    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean').cuda()
     correct = 0
     count = 0
-
+    loss_t = 0
     with torch.no_grad():
 
         for inputs, labels in tqdm(ValidDataloader):
             labels = labels.cuda()
             inputs = inputs.cuda()
             scores = net(inputs)
+            print("scores", scores)
+            print("label", labels)
+            loss = criteria(scores, labels.float())
+            loss_t += loss.item()
 
             scores[scores >= 0.5] = 1
-            scores[scores <= 0.5] = 0
+            scores[scores < 0.5] = 0
             # scores[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
             for k in range(len(scores)):
                 if torch.equal(scores[k], labels[k]):
@@ -57,3 +61,4 @@ for m in ["secondphase_ep20"]:
             count += batch_size
 
     print("accuracy for validation is: ", (correct / count))
+    print("The loss is:", loss_t / (count / batch_size))
