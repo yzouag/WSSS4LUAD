@@ -4,7 +4,6 @@ from tqdm import tqdm
 import numpy as np
 from PIL import Image
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1,2'
 import network
 import torch
 
@@ -28,7 +27,6 @@ def cut_patches(im, im_size, stride, transform):
 
 
 def predict_big_label(image_path, im_size, stride, threshold, model_path):
-    result = {}
     net = network.ResNet()
     pretrained = torch.load(model_path)['model']
     pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
@@ -47,26 +45,23 @@ def predict_big_label(image_path, im_size, stride, threshold, model_path):
         im_list = cut_patches(im, im_size=im_size, stride=stride, transform=transform).cuda()
         label = [0, 0, 0]
         total_scores = []
-        for ims in torch.split(im_list, 64):
+        for ims in torch.split(im_list, 16):
             with torch.no_grad():
                 scores = torch.sigmoid(net(ims))
                 total_scores.append(scores.cpu().numpy())
         scores = np.vstack(total_scores)
         for i in range(3):
-            if sum(scores[: ,i] > threshold[i]) >= 1:
+            if sum(scores[: ,i] > threshold[i]) >= 2:
                 label[i] = 1
         image_labels.append(label)
-        result[image] = label
-    with open('prediction.json','w') as f:
-        json.save(f)
     return image_labels
 
-threshold = [0.01, 0.01, 0.995]
-validation = predict_big_label('Dataset/2.validation/img', 200, 60, threshold, 'modelstates/01_best.pth')
-images = os.listdir('Dataset/2.validation/mask')
+threshold = [0.83, 0.21, 0.96]
+validation = predict_big_label('Dataset/2.validation/img', 225, 80, threshold, 'modelstates/01_best.pth')
+images = os.listdir('/Dataset/2.validation/mask')
 gt = []
 for image in images:
-    image_path = os.path.join('Dataset/2.validation/mask', image)
+    image_path = os.path.join('/Dataset/2.validation/mask', image)
     im = np.asarray(Image.open(image_path))
     label = [0,0,0]
     im_label = np.unique(im)
