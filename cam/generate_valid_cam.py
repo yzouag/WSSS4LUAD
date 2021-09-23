@@ -6,7 +6,7 @@ from torchvision import transforms
 import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader
-import dataset.dataset as dataset
+import dataset
 import network
 import torch
 from math import inf

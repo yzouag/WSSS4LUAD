@@ -3,7 +3,7 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES']='2'
 import torch
 import network
-import dataset.dataset as dataset
+import dataset
 from torch.utils.data import DataLoader
 import numpy as np
 import torch.nn.functional as F
