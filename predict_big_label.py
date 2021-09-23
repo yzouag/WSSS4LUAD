@@ -58,7 +58,7 @@ def predict_big_label(image_path, im_size, stride, threshold, model_path):
         image_labels.append(label)
         result[image] = label
     with open('prediction.json','w') as f:
-        json.save(f)
+        json.dump(result, f)
     return image_labels
 
 threshold = [0.01, 0.01, 0.995]

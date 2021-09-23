@@ -11,6 +11,7 @@ import network
 import torch
 from math import inf
 import os
+import json
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 parser = argparse.ArgumentParser()
@@ -62,7 +63,12 @@ onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose
 print("Dataset", len(onlineDataset))
 onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
+with open('result.json') as f:
+    big_labels = json.load(f)
+
 for im_path, im_list, position_list in tqdm(onlineDataloader):
+    print(im_path[0])
+    break
     orig_img = np.asarray(Image.open(im_path[0]))
     def tocamlist(im):
         im = im.cuda()
@@ -90,7 +96,7 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
     # cam_min = np.min(sum_cam, (1,2), keepdims=True)
     # sum_cam[sum_cam < cam_min+1e-5] = 0
     # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
-    big_label = np.array([int(im_path[0][-12]), int(im_path[0][-9]), int(im_path[0][-6])])
+    big_label = big_labels[im_path[0][]]
     for i in range(3):
         if big_label[i] == 0:
             sum_cam[i, :, :] = -inf
