@@ -23,12 +23,16 @@ def calculate_IOU(pred, real):
 def get_mIOU(mask, groundtruth, prediction):
     prediction = np.reshape(prediction, (-1))
     groundtruth = groundtruth.reshape(-1)
+    mask = mask.reshape(-1)
+    print(prediction.shape)
+    print(groundtruth.shape)
+    print(mask.shape)
     length = len(prediction)
 
     after_mask_pred = []
     after_mask_true = []
     for i in range(length):
-        if mask[i]:
+        if mask[i] == 0:
             after_mask_true.append(groundtruth[i])
             after_mask_pred.append(prediction[i])
 
@@ -102,9 +106,7 @@ for i in tqdm(range(30)):
     plt.imshow(im_mask)
     plt.title('cam with background mask')
 
-    plt.savefig(f'heatmap1/{i:02d}.png')
-    plt.show()
-    break
+    plt.savefig(f'heatmap/{i:02d}.png')
     plt.close()
 
 # heatmap = ((cam/3)*255).astype(np.uint8)

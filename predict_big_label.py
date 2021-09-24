@@ -65,6 +65,7 @@ threshold = [0.01, 0.01, 0.995]
 validation = predict_big_label('Dataset/2.validation/img', 200, 60, threshold, 'modelstates/01_best.pth')
 images = os.listdir('Dataset/2.validation/mask')
 gt = []
+groundtruth = {}
 for image in images:
     image_path = os.path.join('Dataset/2.validation/mask', image)
     im = np.asarray(Image.open(image_path))
@@ -74,6 +75,9 @@ for image in images:
         if i in im_label:
             label[i] = 1
     gt.append(label)
+    groundtruth[image] = label
+with open('groundtruth.json', 'w') as fp:
+    json.dump(groundtruth, fp)
 
 res = {
     'pred': validation,

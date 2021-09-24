@@ -21,12 +21,14 @@ parser.add_argument("-side", default=96, type=int, required=False)
 parser.add_argument("-stride", default=32, type=int, required=False)
 parser.add_argument("-m", default="model_last", type=str,
                     required=True, help="model name")
+parser.add_argument("-b", action='store_true', help='whether to use big label mask before generate cam')
 args = parser.parse_args()
 
 for_validation = args.v
 side_length = args.side
 stride = args.stride
 model_name = args.m
+use_big_label = args.b
 
 if for_validation:
     out_cam = "./validation_out_cam"
@@ -63,12 +65,10 @@ onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose
 print("Dataset", len(onlineDataset))
 onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
-with open('result.json') as f:
+with open('groundtruth.json') as f:
     big_labels = json.load(f)
 
 for im_path, im_list, position_list in tqdm(onlineDataloader):
-    print(im_path[0])
-    break
     orig_img = np.asarray(Image.open(im_path[0]))
     def tocamlist(im):
         im = im.cuda()
@@ -92,14 +92,11 @@ for im_path, im_list, position_list in tqdm(onlineDataloader):
     sum_counter[sum_counter < 1] = 1
 
     sum_cam = sum_cam / sum_counter
-    # cam_max = np.max(sum_cam, (1,2), keepdims=True)
-    # cam_min = np.min(sum_cam, (1,2), keepdims=True)
-    # sum_cam[sum_cam < cam_min+1e-5] = 0
-    # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
-    big_label = big_labels[im_path[0][]]
-    for i in range(3):
-        if big_label[i] == 0:
-            sum_cam[i, :, :] = -inf
+    if use_big_label:
+      big_label = big_labels[im_path[0][-6:]]
+      for i in range(3):
+          if big_label[i] == 0:
+              sum_cam[i, :, :] = -inf
     result_label = sum_cam.argmax(axis=0)
 
     if out_cam is not None:
