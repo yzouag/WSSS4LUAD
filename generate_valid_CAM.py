@@ -10,7 +10,7 @@ import network
 import torch
 from math import inf
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 dataset_path = "./Dataset/2.validation/img"
 model_name = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
@@ -88,6 +88,6 @@ for i in range(4):
         if not os.path.exists('out_cam'):
             os.mkdir('out_cam')
 
-        if not os.path.exists(f'out_cam/{model_name}'):
-            os.mkdir(f'out_cam/{model_name}')
-        np.save(f'out_cam/{model_name}/{im_path[0][-6:-4]}.npy', result_label)
+        if not os.path.exists(f'out_cam/{model_name[i]}'):
+            os.mkdir(f'out_cam/{model_name[i]}')
+        np.save(f'out_cam/{model_name[i]}/{im_path[0][-6:-4]}.npy', result_label)
