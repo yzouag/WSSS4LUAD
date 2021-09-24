@@ -23,10 +23,7 @@ def calculate_IOU(pred, real):
 def get_mIOU(mask, groundtruth, prediction):
     prediction = np.reshape(prediction, (-1))
     groundtruth = groundtruth.reshape(-1)
-    mask = mask.reshape(-1)
-    print(prediction.shape)
-    print(groundtruth.shape)
-    print(mask.shape)
+    mask = mask.reshape(-1)    
     length = len(prediction)
 
     after_mask_pred = []
@@ -70,8 +67,9 @@ else:
     shutil.rmtree(heatmap_path)
     os.mkdir(heatmap_path)
 
-
-for i in tqdm(range(30)):
+# sample five images for each model to compare
+visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
+for i in tqdm(range(40)):
     mask = np.asarray(Image.open(mask_path+f'/{i:02d}.png'))
     cam = np.load(os.path.join(cam_path, npy_names[i]), allow_pickle=True).astype(np.uint8)
     palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
@@ -106,7 +104,7 @@ for i in tqdm(range(30)):
     plt.imshow(im_mask)
     plt.title('cam with background mask')
 
-    plt.savefig(f'heatmap/{i:02d}.png')
+    plt.savefig(f'{heatmap_path}/{i:02d}.png')
     plt.close()
 
 # heatmap = ((cam/3)*255).astype(np.uint8)
