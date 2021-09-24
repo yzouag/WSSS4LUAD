@@ -18,7 +18,7 @@ def cropImage(file_info):
         for j in range(patches.shape[1]):
             if checkProportion(patches[i, j, 0, : , :, :], threshold):
                 result = Image.fromarray(np.uint8(patches[i, j, 0, : , :, :]))
-                result.save("./train_single_patches/image" + str(count) + "_" + str(i) + str(j) + '_' + str(c) + '.png')
+                result.save("./train_single_patches1/image" + str(count) + "_" + str(i) + str(j) + '_' + str(c) + '.png')
 
 def checkProportion(im_arr, threshold = 0.6):
     # assert len(im_arr.shape) == 3, "The imput image must have 3D shape!"
@@ -42,14 +42,14 @@ def checkProportion(im_arr, threshold = 0.6):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "-threshold", type=float, default=0.6, required=False, help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=96, type=int)
-    parser.add_argument("-stride", default=32, type=int)
+    parser.add_argument("-shape", default=56, type=int)
+    parser.add_argument("-stride", default=28, type=int)
     args = parser.parse_args()
     threshold = args.t
     patch_shape = args.shape
     stride = args.stride
     # print(threshold)
-    cut_result_path = "./train_single_patches"
+    cut_result_path = "./train_single_patches1"
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
     else:

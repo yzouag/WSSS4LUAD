@@ -47,11 +47,12 @@ for m in ["secondphase_ep10"]:
             labels = labels.cuda()
             inputs = inputs.cuda()
             scores = net(inputs)
-            print("scores", scores)
-            print("label", labels)
+            # print("scores", scores)
+            # print("label", labels)
             loss = criteria(scores, labels.float())
             loss_t += loss.item()
 
+            scores = torch.sigmoid(scores)
             scores[scores >= 0.5] = 1
             scores[scores < 0.5] = 0
             # scores[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
