@@ -65,6 +65,7 @@ for i in range(epochs):
         loss = criteria(scores, label.float())
         
         # Use 0.5 as threshold for all classes
+        scores = torch.sigmoid(scores)
         predict = torch.zeros_like(scores)
         predict[scores > 0.7] = 1
         predict[scores < 0.3] = 0

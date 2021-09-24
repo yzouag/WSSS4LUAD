@@ -240,6 +240,10 @@ def online_cut_patches(im, im_size=56, stride=28):
     if w % stride != 0:
         w_ = np.append(w_, w - im_size)
 
+    if h_[0] < 0:
+        h_[0] = 0
+    if w_[0] < 0:
+        w_[0] = 0
     for i in h_:
         for j in w_:   	
             temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
