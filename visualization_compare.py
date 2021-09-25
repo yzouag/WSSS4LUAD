@@ -37,7 +37,7 @@ def get_mIOU(mask, groundtruth, prediction):
     return score
 
 
-model_names = ['secondphase_5628_last'] # 'model_last', '9632_ep10', '01_best'
+model_names = ['secondphase_9632_ep10']
 
 img_path = 'Dataset/2.validation/img'
 gt_path = 'Dataset/2.validation/mask'

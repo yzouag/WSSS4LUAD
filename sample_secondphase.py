@@ -15,17 +15,18 @@ def sample_single_label(single_path, result_path="sample_single_patches"):
     else:
         shutil.rmtree(result_path)
         os.mkdir(result_path)
-    dic = {0 : [], 1 : [], 2 : []}
+    # dic = {0 : [], 1 : [], 2 : []}
     for file in os.listdir(single_path):
-        index = int(file[-5])
-        dic[index].append(file)
+        copyfile(osp(single_path, file), osp(result_path, file))
+        # index = int(file[-5])
+        # dic[index].append(file)
 
-    minlength = min(len(dic[0]), len(dic[1]), len(dic[2]))
-    select_index = np.random.choice(minlength, 5000, replace=False)
-    for k in tqdm(select_index):
-        copyfile(osp(single_path, dic[0][k]), osp(result_path, dic[0][k]))
-        copyfile(osp(single_path, dic[1][k]), osp(result_path, dic[1][k]))
-        copyfile(osp(single_path, dic[2][k]), osp(result_path, dic[2][k]))
+    # minlength = min(len(dic[0]), len(dic[1]), len(dic[2]))
+    # select_index = np.random.choice(minlength, 4000, replace=False)
+    # for k in tqdm(select_index):
+    #     copyfile(osp(single_path, dic[0][k]), osp(result_path, dic[0][k]))
+    #     copyfile(osp(single_path, dic[1][k]), osp(result_path, dic[1][k]))
+    #     copyfile(osp(single_path, dic[2][k]), osp(result_path, dic[2][k]))
     return
 
 def sample_double_label(double_path, result_path="sample_double_patches"):
@@ -40,7 +41,7 @@ def sample_double_label(double_path, result_path="sample_double_patches"):
         # if fileindex == "[1 0 0]":
         #     tumor.append(file)
         # Since not confident, so we only copy the 110 files
-        if fileindex == "[1 1 0]":
+        if fileindex != "[0 0 0]":
             copyfile(osp(double_path, file), osp(result_path, file))
 
     # select_index = np.random.choice(len(tumor), 3500, replace=False)
@@ -59,6 +60,6 @@ def calculate_index(path):
 
 if __name__ == "__main__":
     sample_single_label("train_single_patches1")
-    sample_double_label("patch5632_train")
+    sample_double_label("patch16456_train")
     # calculate_index("sample_single_patches")
     calculate_index("sample_double_patches")

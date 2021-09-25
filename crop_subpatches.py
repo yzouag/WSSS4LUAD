@@ -23,6 +23,8 @@ def crop_train_image(file_info):
     imfile, count, threshold, labels, cut_result_path, patch_shape, stride = file_info
     im = Image.open(imfile)
     im_arr = np.asarray(im)
+    if im_arr.shape[0] < patch_shape or im_arr.shape[1] < patch_shape:
+        return
     patches = patchify(im_arr, (patch_shape, patch_shape, 3), step=stride)
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
@@ -172,7 +174,7 @@ def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
     """
     if is_new:
         net = network.ResNet()
-        model_path = 'modelstates/01_best.pth'    # TODO: avoid hard code
+        model_path = 'modelstates/bigmodel_best.pth'    # TODO: avoid hard code
         pretrained = torch.load(model_path)['model']
         pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
         net.load_state_dict(pretrained_modify)
@@ -253,7 +255,7 @@ if __name__ == "__main__":
                         help="The threshold to infer a crop has certain type of cells")
     parser.add_argument("-w", "--white", type=float, default=0.5, required=False,
                         help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=128, type=int)
+    parser.add_argument("-shape", default=164, type=int)
     parser.add_argument("-stride", default=56, type=int)
     parser.add_argument("-d", "--dataset", default=1, type=int,
                         help="the crop dataset, 1.training, 2.validation, 3.testing", choices=[1, 2, 3])
@@ -261,12 +263,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        save_name = 'patch12856'
+        save_name = 'patch16456'
         valid = 'valid_single_patches/'
         generate_image_label_score(valid, save_name, num_workers=1, batch_size=64, is_new=True)
         prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=100)
         print(json.dumps(prediction_threshold, indent=4))
-        with open('prediction_threshold128.json', 'w') as fp:
+        with open('prediction_threshold164.json', 'w') as fp:
             json.dump(prediction_threshold, fp)
         exit()
 
@@ -289,27 +291,27 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    # else:
-    #     shutil.rmtree(cut_result_path)
-    #     os.mkdir(cut_result_path)
+    else:
+        shutil.rmtree(cut_result_path)
+        os.mkdir(cut_result_path)
 
     if dataset == 1:
-        # file_list = []
-        # for file in os.listdir(dataset_path):
-        #     label = file.split('-')[-1][:-4]
-        #     labels = [int(label[1]), int(label[4]), int(label[7])]
-        #     if sum(labels) > 1:
-        #         file_list.append((os.path.join(
-        #             dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
-        # process_map(crop_train_image, file_list, max_workers=6)
+        file_list = []
+        for file in os.listdir(dataset_path):
+            label = file.split('-')[-1][:-4]
+            labels = [int(label[1]), int(label[4]), int(label[7])]
+            if sum(labels) > 1:
+                file_list.append((os.path.join(
+                    dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
+        process_map(crop_train_image, file_list, max_workers=6)
 
-        save_score_name = 'patch5632_train'
-        # generate_image_label_score(
-        #     cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
-        with open('prediction_threshold56.json') as json_file:
+        save_score_name = 'patch16456_train'
+        generate_image_label_score(
+            cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+        with open('prediction_threshold164.json') as json_file:
             prediction_threshold = json.load(json_file)
         get_crop_label(
-            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'patch5632_train')
+            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'patch16456_train')
 
     if dataset == 2:
         image_names = os.listdir(valid_mask_path)

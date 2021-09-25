@@ -1,31 +1,29 @@
-import json
-from PIL import Image
-from tqdm import tqdm
-from torchvision import transforms
-import torch.nn.functional as F
-import numpy as np
-from torch.utils.data import DataLoader
-import dataset
-import network
-import torch
-from math import inf
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
-# IMPORTANT! Note we use the norm in all cases.
-dataset_path = "./Dataset/2.validation/img"
-model_name = ['secondphase_12856_ep10', 'secondphase_16456_last'] # 'model_last', '9632_ep10', '01_best'
-model_crop = [(128, 56), (164, 56)]
+# os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+import torch
+import network
+import dataset
+from torch.utils.data import DataLoader
+import numpy as np
+import torch.nn.functional as F
+from torchvision import transforms
+from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
+import argparse
+from PIL import Image
+import shutil
+from math import inf
 
-visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
+dataset_path = "./Dataset/1.training"
 
-with open('groundtruth.json') as f:
-    big_labels = json.load(f)
-
-for i in range(2):
+modellist = ['secondphase_9632_ep10', 'secondphase_12856_ep10', 'secondphase_16456_last']
+model_crop = [(96, 32), (128, 56), (164, 56)]
+for i in range(len(modellist)):
+    model_name = modellist[i]
     net = network.ResNetCAM()
-    path = "./modelstates/" + model_name[i] + ".pth"
+    path = "./modelstates/" + model_name + ".pth"
     pretrained = torch.load(path)['model']
-    pretrained = {k[7:]: v for k, v in pretrained.items()}
+    pretrained = {k[7:] : v for k, v in pretrained.items()}
     pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
     pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
 
@@ -33,21 +31,20 @@ for i in range(2):
     print(f'Model loaded from {path} Successfully')
     net.cuda()
     net.eval()
-
     side_length = model_crop[i][0]
     stride = model_crop[i][1]
     onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((224,224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
         patch_size=side_length,
-        stride=stride)
+        stride=stride
+        )
 
+    print("Dataset", len(onlineDataset))
     onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
     for im_path, im_list, position_list in tqdm(onlineDataloader):
-        if int(im_path[0][-6:-4]) not in visualize_pick:
-            continue
 
         orig_img = np.asarray(Image.open(im_path[0]))
 
@@ -69,26 +66,20 @@ for i in range(2):
         sum_counter[sum_counter < 1] = 1
 
         norm_cam = sum_cam / sum_counter
-
-        # are these four lines useful?
         # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
         # cam_min = np.min(sum_cam, (1, 2), keepdims=True)
         # sum_cam[sum_cam < cam_min+1e-5] = 0
         # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
 
-        big_label = big_labels[im_path[0][-6:]]
+        big_label = np.array([int(im_path[0][-12]), int(im_path[0][-9]), int(im_path[0][-6])])
         for k in range(3):
             if big_label[k] == 0:
                 norm_cam[k, :, :] = -inf
-        result_label = norm_cam.argmax(axis=0)
 
-        if not os.path.exists('out_cam'):
-            os.mkdir('out_cam')
+        if not os.path.exists('ensemble_candidates'):
+            os.mkdir('ensemble_candidates')
 
-        if not os.path.exists(f'out_cam/{model_name[i]}_cam_nonorm'):
-            os.mkdir(f'out_cam/{model_name[i]}_cam_nonorm')
-        np.save(f'out_cam/{model_name[i]}_cam_nonorm/{im_path[0][-6:-4]}.npy', norm_cam)
-
-        # if not os.path.exists(f'out_cam/{model_name[i]}'):
-        #     os.mkdir(f'out_cam/{model_name[i]}')
-        # np.save(f'out_cam/{model_name[i]}/{im_path[0][-6:-4]}.npy', result_label)
+        if not os.path.exists(f'ensemble_candidates/{model_name}_cam_nonorm'):
+            os.mkdir(f'ensemble_candidates/{model_name}_cam_nonorm')
+        resultpath = im_path[0].split('/')[-1].split('.')[0]
+        np.save(f'ensemble_candidates/{model_name}_cam_nonorm/{resultpath}.npy', norm_cam)

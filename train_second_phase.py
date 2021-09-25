@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1,2'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset
@@ -21,12 +21,12 @@ args = parser.parse_args()
 batch_size = args.batch
 devices = args.device
 setting_str = args.setting
-base_lr = 0.0002
+base_lr = 0.0003
 net = network.ResNet()
 
-path = "modelstates/5628_last.pth"
+path = "modelstates/16456_ep20.pth"
 pretrained = torch.load(path)['model']
-# pretrained = {k[7:] : v for k, v in pretrained.items()}
+pretrained = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained)
 print(f'Model loaded from {path} Successfully')
 net = torch.nn.DataParallel(net, device_ids=devices).cuda()
@@ -48,7 +48,7 @@ criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
 
-epochs = 30
+epochs = 20
 loss_g = []
 accuracy_g = []
 

@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1,2'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset

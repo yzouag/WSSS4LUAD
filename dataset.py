@@ -35,7 +35,7 @@ class DoubleLabelDataset(Dataset):
         return len(self.files_s) + len(self.files_d)
 
     def __getitem__(self, idx):
-        if idx < 15000:
+        if idx < 9040:
             image_path = os.path.join(self.path_s, self.files_s[idx])
             im = Image.open(image_path)
             if self.transform:
@@ -44,7 +44,7 @@ class DoubleLabelDataset(Dataset):
             activate = int(self.files_s[idx][-5])
             label[activate] = 1
         else:
-            idx -= 15000
+            idx -= 9040
             image_path = os.path.join(self.path_d, self.files_d[idx])
             im = Image.open(image_path)
             if self.transform:
