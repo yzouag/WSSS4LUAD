@@ -34,17 +34,18 @@ def sample_double_label(double_path, result_path="sample_double_patches"):
     else:
         shutil.rmtree(result_path)
         os.mkdir(result_path)
-    tumor = []
+    # tumor = []
     for file in os.listdir(double_path):
         fileindex = (file[-11: -4])
-        if fileindex == "[1 0 0]":
-            tumor.append(file)
-        elif fileindex == "[0 1 0]" or fileindex == "[0 0 1]":
+        # if fileindex == "[1 0 0]":
+        #     tumor.append(file)
+        # Since not confident, so we only copy the 110 files
+        if fileindex == "[1 1 0]":
             copyfile(osp(double_path, file), osp(result_path, file))
 
-    select_index = np.random.choice(len(tumor), 3500, replace=False)
-    for k in tqdm(select_index):
-        copyfile(osp(double_path, tumor[k]), osp(result_path, tumor[k]))
+    # select_index = np.random.choice(len(tumor), 3500, replace=False)
+    # for k in tqdm(select_index):
+    #     copyfile(osp(double_path, tumor[k]), osp(result_path, tumor[k]))
     return
 
 def calculate_index(path):
@@ -59,5 +60,5 @@ def calculate_index(path):
 if __name__ == "__main__":
     sample_single_label("train_single_patches1")
     sample_double_label("patch5632_train")
-    calculate_index("sample_single_patches")
+    # calculate_index("sample_single_patches")
     calculate_index("sample_double_patches")

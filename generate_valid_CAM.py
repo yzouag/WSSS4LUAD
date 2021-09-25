@@ -11,26 +11,23 @@ import torch
 from math import inf
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2'
-
+# IMPORTANT! Note we use the norm in all cases.
 dataset_path = "./Dataset/2.validation/img"
-model_name = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
-model_crop = [(96, 32), (56, 28), (96, 32), (225, 100)]
+model_name = ['secondphase_5628_last'] # 'model_last', '9632_ep10', '01_best'
+model_crop = [(56, 28)] # (96, 32), (96, 32), (225, 100)
 
 visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
 
 with open('groundtruth.json') as f:
     big_labels = json.load(f)
 
-for i in range(4):
+for i in range(1):
     net = network.ResNetCAM()
     path = "./modelstates/" + model_name[i] + ".pth"
     pretrained = torch.load(path)['model']
-    if i != 1:  # only exception is the model_last
-        pretrained = {k[7:]: v for k, v in pretrained.items()}
-    pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(
-        -1).unsqueeze(-1).to(torch.float64)
-    pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(
-        -1).unsqueeze(-1).to(torch.float64)
+    pretrained = {k[7:]: v for k, v in pretrained.items()}
+    pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+    pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
 
     net.load_state_dict(pretrained)
     print(f'Model loaded from {path} Successfully')
@@ -64,9 +61,9 @@ for i in range(4):
 
         sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
         sum_counter = np.zeros_like(sum_cam)
-        for i in range(len(cam_list)):
-            y, x = position_list[i][0], position_list[i][1]
-            crop = cam_list[i]
+        for k in range(len(cam_list)):
+            y, x = position_list[k][0], position_list[k][1]
+            crop = cam_list[k]
             sum_cam[:, y:y+side_length, x:x+side_length] += crop
             sum_counter[:, y:y+side_length, x:x+side_length] += 1
         sum_counter[sum_counter < 1] = 1
@@ -80,13 +77,17 @@ for i in range(4):
         norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
 
         big_label = big_labels[im_path[0][-6:]]
-        for i in range(3):
-            if big_label[i] == 0:
-                norm_cam[i, :, :] = -inf
+        for k in range(3):
+            if big_label[k] == 0:
+                norm_cam[k, :, :] = -inf
         result_label = norm_cam.argmax(axis=0)
 
         if not os.path.exists('out_cam'):
             os.mkdir('out_cam')
+
+        if not os.path.exists(f'out_cam/{model_name[i]}_cam'):
+            os.mkdir(f'out_cam/{model_name[i]}_cam')
+        np.save(f'out_cam/{model_name[i]}_cam/{im_path[0][-6:-4]}.npy', norm_cam)
 
         if not os.path.exists(f'out_cam/{model_name[i]}'):
             os.mkdir(f'out_cam/{model_name[i]}')

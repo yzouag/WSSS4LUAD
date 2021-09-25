@@ -37,8 +37,8 @@ def checkProportion(im_arr, threshold = 0.5):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False, help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=96, type=int)
-    parser.add_argument("-stride", default=48, type=int)
+    parser.add_argument("-shape", default=128, type=int)
+    parser.add_argument("-stride", default=56, type=int)
     args = parser.parse_args()
     threshold = args.t
     patch_shape = args.shape

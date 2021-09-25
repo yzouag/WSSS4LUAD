@@ -26,7 +26,7 @@ class SingleLabelDataset(Dataset):
 class DoubleLabelDataset(Dataset):
     def __init__(self, transform=None):
         self.path_s = "sample_single_patches"
-        self.path_d = "train_double_patches"
+        self.path_d = "sample_double_patches"
         self.files_s = os.listdir(self.path_s)
         self.files_d = os.listdir(self.path_d)
         self.transform = transform
