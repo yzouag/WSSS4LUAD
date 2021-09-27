@@ -30,15 +30,15 @@ def checkProportion(im_arr, threshold = 0.5):
         return 3
     im_type = np.array([0, 0, 0])
     for i in range(3):
-        if type_count[i] / len(im_arr) > 0.25:
+        if type_count[i] / len(im_arr) > 0.20:
             im_type[i] = 1
     return im_type
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "-threshold", type=float, default=0.5, required=False, help="The threshold to use to eliminate images with white proportions")
+    parser.add_argument("-t", "-threshold", type=float, default=0.7, required=False, help="The threshold to use to eliminate images with white proportions")
     parser.add_argument("-shape", default=96, type=int)
-    parser.add_argument("-stride", default=48, type=int)
+    parser.add_argument("-stride", default=32, type=int)
     args = parser.parse_args()
     threshold = args.t
     patch_shape = args.shape

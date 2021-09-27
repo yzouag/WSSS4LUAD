@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2,3'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset
@@ -25,33 +25,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=64, type=int)
 parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
 parser.add_argument('-setting', type=str, help='the stride and pathsize setting', required=True)
-parser.add_argument("-bce", action='store_true', help='whether to use bce loss')
 args = parser.parse_args()
 
 batch_size = args.batch
 devices = args.device
-# print(devices)
 setting_str = args.setting
-use_bce = args.bce
 base_lr = 0.001
-net = network.ResNet().cuda()
-assert os.path.exists("./train_single_patches"), "The directory train_single_patches haven't been genereated!"
+# net = network.ResNet().cuda()
+net = network.scalenet152(structure_path='structures/scalenet152.json', ckpt='weights/scalenet152.pth')
+assert os.path.exists("./train_single_patches1"), "The directory train_single_patches haven't been genereated!"
 
 # Get pretrained model
-resnet101 = models.resnet101(pretrained=True) 
-pretrained_dict =resnet101.state_dict()
-model_dict = net.state_dict()
-pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict} 
-model_dict.update(pretrained_dict)
+# resnet101 = models.resnet101(pretrained=True) 
+# pretrained_dict =resnet101.state_dict()
+# model_dict = net.state_dict()
+# pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict} 
+# model_dict.update(pretrained_dict)
 # Load pretraiend parameters
-net.load_state_dict(model_dict)
+# net.load_state_dict(model_dict)
 
 net = torch.nn.DataParallel(net, device_ids=devices).cuda()
 net.train()
 
-TrainDataset = dataset.SingleLabelDataset("train_single_patches/", transform=transforms.Compose([
-    transforms.Resize(224),
-    # transforms.RandomCrop(224),
+TrainDataset = dataset.SingleLabelDataset("train_single_patches1/", transform=transforms.Compose([
+    transforms.Resize((224,224)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.ToTensor(),
@@ -61,15 +58,12 @@ print("Dataset", len(TrainDataset))
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
-if not use_bce:
-    criteria = torch.nn.CrossEntropyLoss(reduction='mean')
-else:
-    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.2)
+criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
 
-epochs = 20
+epochs = 15
 loss_g = []
 accuracy_g = []
 
@@ -83,13 +77,12 @@ for i in range(epochs):
         img = img.cuda()
         
         scores = net(img)
-        if not use_bce:
-            label = label.cuda()
-            loss = criteria(scores, label)
-        else:
-            onehot_label = convertinttoonehot(label).cuda()
-            loss = criteria(scores, onehot_label)
-            label = label.cuda()
+        # label = label.cuda()
+        # loss = criteria(scores, label)
+
+        onehot_label = convertinttoonehot(label).cuda()
+        loss = criteria(scores, onehot_label)
+        label = label.cuda()
         
         level = scores.detach().argmax(dim = 1)
         b = level == label

@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1,2'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset
@@ -21,10 +21,11 @@ args = parser.parse_args()
 batch_size = args.batch
 devices = args.device
 setting_str = args.setting
-base_lr = 0.0005
-net = network.ResNet()
+base_lr = 0.0003
+# net = network.ResNet()
+net = network.scalenet101(structure_path='structures/scalenet101.json')
 
-path = "modelstates/9632_ep10.pth"
+path = "modelstates/scalenet101_last.pth"
 pretrained = torch.load(path)['model']
 pretrained = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained)
@@ -48,7 +49,7 @@ criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
 
-epochs = 30
+epochs = 20
 loss_g = []
 accuracy_g = []
 
@@ -92,11 +93,11 @@ fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/loss_secondphase2.png')
+plt.savefig('./image/loss_secondphase.png')
 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/accuracy_secondphase2.png')
+plt.savefig('./image/accuracy_secondphase.png')

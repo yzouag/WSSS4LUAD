@@ -8,10 +8,12 @@ import shutil
 
 def cropImage(file_info):
     imfile, c, count, threshold = file_info
-    print(imfile)
+    print(count)
     full_path = './Dataset/1.training/' + imfile
     im = Image.open(full_path)
     im_arr = np.asarray(im)
+    if im_arr.shape[0] < patch_shape or im_arr.shape[1] < patch_shape:
+        return
     patches = patchify(im_arr, (patch_shape, patch_shape, 3), step = stride)
     # print(patches.shape)
     for i in range(patches.shape[0]):
@@ -20,7 +22,7 @@ def cropImage(file_info):
                 result = Image.fromarray(np.uint8(patches[i, j, 0, : , :, :]))
                 result.save("./train_single_patches1/image" + str(count) + "_" + str(i) + str(j) + '_' + str(c) + '.png')
 
-def checkProportion(im_arr, threshold = 0.6):
+def checkProportion(im_arr, threshold = 0.9):
     # assert len(im_arr.shape) == 3, "The imput image must have 3D shape!"
     # assert im_arr.shape[2] == 3, "Our input image has to be RGB type!"
 
@@ -41,9 +43,9 @@ def checkProportion(im_arr, threshold = 0.6):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "-threshold", type=float, default=0.6, required=False, help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=56, type=int)
-    parser.add_argument("-stride", default=28, type=int)
+    parser.add_argument("-t", "-threshold", type=float, default=0.9, required=False, help="The threshold to use to eliminate images with white proportions")
+    parser.add_argument("-shape", default=96, type=int)
+    parser.add_argument("-stride", default=32, type=int)
     args = parser.parse_args()
     threshold = args.t
     patch_shape = args.shape

@@ -26,7 +26,7 @@ class SingleLabelDataset(Dataset):
 class DoubleLabelDataset(Dataset):
     def __init__(self, transform=None):
         self.path_s = "sample_single_patches"
-        self.path_d = "train_double_patches"
+        self.path_d = "sample_double_patches"
         self.files_s = os.listdir(self.path_s)
         self.files_d = os.listdir(self.path_d)
         self.transform = transform
@@ -35,7 +35,7 @@ class DoubleLabelDataset(Dataset):
         return len(self.files_s) + len(self.files_d)
 
     def __getitem__(self, idx):
-        if idx < 15000:
+        if idx < 21000:
             image_path = os.path.join(self.path_s, self.files_s[idx])
             im = Image.open(image_path)
             if self.transform:
@@ -44,7 +44,7 @@ class DoubleLabelDataset(Dataset):
             activate = int(self.files_s[idx][-5])
             label[activate] = 1
         else:
-            idx -= 15000
+            idx -= 21000
             image_path = os.path.join(self.path_d, self.files_d[idx])
             im = Image.open(image_path)
             if self.transform:
@@ -232,18 +232,24 @@ def online_cut_patches(im, im_size=56, stride=28):
     position_list = []
 
     h, w, _ = im.shape
+    if h < im_size:
+        h_ = np.array([0])
+    else:
+        h_ = np.arange(0, h - im_size + 1, stride)
+        if h % stride != 0:
+            h_ = np.append(h_, h-im_size)
 
-    h_ = np.arange(0, h - im_size + 1, stride)
-    if h % stride != 0:
-        h_ = np.append(h_, h-im_size)
-    w_ = np.arange(0, w - im_size + 1, stride)
-    if w % stride != 0:
-        w_ = np.append(w_, w - im_size)
+    if w < im_size:
+        w_ = np.array([0])
+    else:
+        w_ = np.arange(0, w - im_size + 1, stride)
+        if w % stride != 0:
+            w_ = np.append(w_, w - im_size)
 
-    if h_[0] < 0:
-        h_[0] = 0
-    if w_[0] < 0:
-        w_[0] = 0
+    # if h_[0] < 0:
+    #     h_[0] = 0
+    # if w_[0] < 0:
+    #     w_[0] = 0
     for i in h_:
         for j in w_:   	
             temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
