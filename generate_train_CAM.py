@@ -16,8 +16,8 @@ from math import inf
 
 dataset_path = "./Dataset/1.training"
 
-modellist = ['secondphase_9632_ep10', 'secondphase_12856_ep10', 'secondphase_16456_last']
-model_crop = [(96, 32), (128, 56), (164, 56)]
+modellist = ['secondphase_16456_last']
+model_crop = [(164, 56)]
 for i in range(len(modellist)):
     model_name = modellist[i]
     net = network.ResNetCAM()
@@ -47,11 +47,17 @@ for i in range(len(modellist)):
     for im_path, im_list, position_list in tqdm(onlineDataloader):
 
         orig_img = np.asarray(Image.open(im_path[0]))
+        interpolatex = side_length
+        interpolatey = side_length
+        if orig_img.shape[0] < side_length:
+            interpolatex = orig_img.shape[0]
+        if orig_img.shape[1] < side_length:
+            interpolatey = orig_img.shape[1]
 
         def tocamlist(im):
             im = im.cuda()
             cam_scores = net(im)
-            cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
+            cam_scores = F.interpolate(cam_scores, (interpolatex, interpolatey), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
             return cam_scores
 
         cam_list = list(map(tocamlist, im_list))

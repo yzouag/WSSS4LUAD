@@ -22,9 +22,10 @@ batch_size = args.batch
 devices = args.device
 setting_str = args.setting
 base_lr = 0.0003
-net = network.ResNet()
+# net = network.ResNet()
+net = network.scalenet101(structure_path='structures/scalenet101.json')
 
-path = "modelstates/16456_ep20.pth"
+path = "modelstates/scalenet101_last.pth"
 pretrained = torch.load(path)['model']
 pretrained = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained)

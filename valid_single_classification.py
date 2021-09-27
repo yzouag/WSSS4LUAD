@@ -18,14 +18,15 @@ parser.add_argument("--batch", default=32, type=int)
 args = parser.parse_args()
 
 batch_size = args.batch
-net = network.ResNet()
+# net = network.ResNet()
+net = network.scalenet101(structure_path='structures/scalenet101.json')
 
-for m in ["16456_ep10", "16456_ep20", "16456_last"]:
+for m in ["scalenet101_ep5", "scalenet101_ep10", "scalenet101_last"]:
 
     path = "./modelstates/" + m + ".pth"
     pretrained = torch.load(path)['model']
-    pretrained_modify = {k[7:] : v for k, v in pretrained.items()}
-    net.load_state_dict(pretrained_modify)
+    pretrained = {k[7:] : v for k, v in pretrained.items()}
+    net.load_state_dict(pretrained)
     print(f'Model loaded from {path}')
     net.cuda()
     net.eval()

@@ -13,16 +13,17 @@ import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 # IMPORTANT! Note we use the norm in all cases.
 dataset_path = "./Dataset/2.validation/img"
-model_name = ['secondphase_12856_ep10', 'secondphase_16456_last'] # 'model_last', '9632_ep10', '01_best'
-model_crop = [(128, 56), (164, 56)]
+model_name = ['secondphase_scalenet101_ep10', 'secondphase_scalenet101_last']
+model_crop = [(96, 32), (96, 32)]
 
 visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
 
 with open('groundtruth.json') as f:
     big_labels = json.load(f)
 
-for i in range(2):
-    net = network.ResNetCAM()
+for i in range(len(model_name)):
+    # net = network.ResNetCAM()
+    net = network.scalenet101_cam(structure_path='structures/scalenet101.json')
     path = "./modelstates/" + model_name[i] + ".pth"
     pretrained = torch.load(path)['model']
     pretrained = {k[7:]: v for k, v in pretrained.items()}
@@ -89,6 +90,6 @@ for i in range(2):
             os.mkdir(f'out_cam/{model_name[i]}_cam_nonorm')
         np.save(f'out_cam/{model_name[i]}_cam_nonorm/{im_path[0][-6:-4]}.npy', norm_cam)
 
-        # if not os.path.exists(f'out_cam/{model_name[i]}'):
-        #     os.mkdir(f'out_cam/{model_name[i]}')
-        # np.save(f'out_cam/{model_name[i]}/{im_path[0][-6:-4]}.npy', result_label)
+        if not os.path.exists(f'out_cam/{model_name[i]}'):
+            os.mkdir(f'out_cam/{model_name[i]}')
+        np.save(f'out_cam/{model_name[i]}/{im_path[0][-6:-4]}.npy', result_label)
