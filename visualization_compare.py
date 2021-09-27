@@ -8,13 +8,14 @@ from PIL import Image
 
 def calculate_IOU(pred, real):
     score = 0
-    num_cluster = 0
+    # num_cluster = 0
     for i in [0, 1, 2]:
         if i in pred:
-            num_cluster += 1
+            # num_cluster += 1
             intersection = sum(np.logical_and(pred == i, real == i))
             union = sum(np.logical_or(pred == i, real == i))
             score += intersection/union
+    num_cluster = len(np.unique(real))
     return score/num_cluster
 
 
@@ -37,6 +38,7 @@ def get_mIOU(mask, groundtruth, prediction):
     return score
 
 
+# model_names = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
 model_names = ['secondphase_scalenet101_last']
 
 img_path = 'Dataset/2.validation/img'
