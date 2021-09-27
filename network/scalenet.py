@@ -121,11 +121,11 @@ class ScaleNet(nn.Module):
 
         x = F.max_pool2d(x, 3, 2, 1)
         x = self.layer1(x)
-        x2 = self.layer2(x)
-        x3 = self.layer3(x2)
-        x4 = self.layer4(x3)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
 
-        result = self.pool(x4)
+        result = self.pool(x)
         result = torch.flatten(result, start_dim=1)
         result = self.fc1(result)
         result = self.fc2(result)
@@ -190,6 +190,6 @@ def scalenet152(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
     # pretrained
     if ckpt != None:
         state_dict = torch.load(ckpt, map_location='cpu')
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
 
     return model

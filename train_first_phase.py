@@ -32,7 +32,7 @@ devices = args.device
 setting_str = args.setting
 base_lr = 0.001
 # net = network.ResNet().cuda()
-net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
+net = network.scalenet152(structure_path='structures/scalenet152.json', ckpt='weights/scalenet152.pth')
 assert os.path.exists("./train_single_patches1"), "The directory train_single_patches haven't been genereated!"
 
 # Get pretrained model
@@ -58,7 +58,7 @@ print("Dataset", len(TrainDataset))
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.2)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()

@@ -13,8 +13,8 @@ import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 # IMPORTANT! Note we use the norm in all cases.
 dataset_path = "./Dataset/2.validation/img"
-model_name = ['secondphase_scalenet101_ep10', 'secondphase_scalenet101_last']
-model_crop = [(96, 32), (96, 32)]
+model_name = ['secondphase_scalenet101_last']
+model_crop = [(96, 32)]
 
 visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
 
@@ -69,13 +69,13 @@ for i in range(len(model_name)):
             sum_counter[:, y:y+side_length, x:x+side_length] += 1
         sum_counter[sum_counter < 1] = 1
 
-        norm_cam = sum_cam / sum_counter
+        sum_cam = sum_cam / sum_counter
 
         # are these four lines useful?
-        # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
-        # cam_min = np.min(sum_cam, (1, 2), keepdims=True)
-        # sum_cam[sum_cam < cam_min+1e-5] = 0
-        # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
+        cam_max = np.max(sum_cam, (1, 2), keepdims=True)
+        cam_min = np.min(sum_cam, (1, 2), keepdims=True)
+        sum_cam[sum_cam < cam_min+1e-5] = 0
+        norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
 
         big_label = big_labels[im_path[0][-6:]]
         for k in range(3):
@@ -86,9 +86,9 @@ for i in range(len(model_name)):
         if not os.path.exists('out_cam'):
             os.mkdir('out_cam')
 
-        if not os.path.exists(f'out_cam/{model_name[i]}_cam_nonorm'):
-            os.mkdir(f'out_cam/{model_name[i]}_cam_nonorm')
-        np.save(f'out_cam/{model_name[i]}_cam_nonorm/{im_path[0][-6:-4]}.npy', norm_cam)
+        if not os.path.exists(f'out_cam/{model_name[i]}_cam'):
+            os.mkdir(f'out_cam/{model_name[i]}_cam')
+        np.save(f'out_cam/{model_name[i]}_cam/{im_path[0][-6:-4]}.npy', norm_cam)
 
         if not os.path.exists(f'out_cam/{model_name[i]}'):
             os.mkdir(f'out_cam/{model_name[i]}')

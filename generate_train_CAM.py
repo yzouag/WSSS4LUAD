@@ -1,5 +1,5 @@
 import os
-# os.environ['CUDA_VISIBLE_DEVICES']='1, 2, 3'
+os.environ['CUDA_VISIBLE_DEVICES']='3'
 import torch
 import network
 import dataset
@@ -16,11 +16,19 @@ from math import inf
 
 dataset_path = "./Dataset/1.training"
 
-modellist = ['secondphase_16456_last']
-model_crop = [(164, 56)]
+modellist = ['secondphase_scalenet101_last']
+model_crop = [(96, 32)]
+out_path = "train_pseudomask"
+if not os.path.exists(out_path):
+    os.mkdir(out_path)
+else:
+    shutil.rmtree(out_path)
+    os.mkdir(out_path)
+
 for i in range(len(modellist)):
     model_name = modellist[i]
-    net = network.ResNetCAM()
+    # net = network.ResNetCAM()
+    net = network.scalenet101_cam(structure_path='structures/scalenet101.json')
     path = "./modelstates/" + model_name + ".pth"
     pretrained = torch.load(path)['model']
     pretrained = {k[7:] : v for k, v in pretrained.items()}
@@ -82,6 +90,8 @@ for i in range(len(modellist)):
             if big_label[k] == 0:
                 norm_cam[k, :, :] = -inf
 
+        result_label = np.argmax(norm_cam, axis=0).astype(np.uint8)
+
         if not os.path.exists('ensemble_candidates'):
             os.mkdir('ensemble_candidates')
 
@@ -89,3 +99,4 @@ for i in range(len(modellist)):
             os.mkdir(f'ensemble_candidates/{model_name}_cam_nonorm')
         resultpath = im_path[0].split('/')[-1].split('.')[0]
         np.save(f'ensemble_candidates/{model_name}_cam_nonorm/{resultpath}.npy', norm_cam)
+        np.save(f'{out_path}/{resultpath}.npy', result_label)
