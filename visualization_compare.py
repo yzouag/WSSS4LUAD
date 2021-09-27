@@ -39,7 +39,7 @@ def get_mIOU(mask, groundtruth, prediction):
 
 
 # model_names = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
-model_names = ['secondphase_scalenet101_last']
+model_names = ['secondphase_scalenet152_last']
 
 img_path = 'Dataset/2.validation/img'
 gt_path = 'Dataset/2.validation/mask'
