@@ -187,6 +187,6 @@ def scalenet152_cam(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
     # pretrained
     if ckpt != None:
         state_dict = torch.load(ckpt, map_location='cpu')
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
 
     return model

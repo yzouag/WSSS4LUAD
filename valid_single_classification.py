@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2, 3'
+os.environ['CUDA_VISIBLE_DEVICES']='3'
 import torch
 import network
 import dataset
@@ -19,9 +19,9 @@ args = parser.parse_args()
 
 batch_size = args.batch
 # net = network.ResNet()
-net = network.scalenet101(structure_path='structures/scalenet101.json')
+net = network.scalenet152(structure_path='structures/scalenet152.json')
 
-for m in ["scalenet101_ep5", "scalenet101_ep10", "scalenet101_last"]:
+for m in ["scalenet152_ep5", "scalenet152_ep10", "scalenet152_last"]:
 
     path = "./modelstates/" + m + ".pth"
     pretrained = torch.load(path)['model']

@@ -44,7 +44,8 @@ gt_path = 'Dataset/2.validation/mask'
 mask_path = 'Dataset/2.validation/background-mask'
 
 # sample 8 images for each model to compare
-visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
+# visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
+visualize_pick = np.arange(40)
 for model_name in model_names:
     for i in tqdm(visualize_pick):
         cam_path = f'out_cam/{model_name}'

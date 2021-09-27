@@ -23,9 +23,9 @@ devices = args.device
 setting_str = args.setting
 base_lr = 0.0003
 # net = network.ResNet()
-net = network.scalenet101(structure_path='structures/scalenet101.json')
+net = network.scalenet152(structure_path='structures/scalenet152.json')
 
-path = "modelstates/scalenet101_last.pth"
+path = "modelstates/scalenet152_last.pth"
 pretrained = torch.load(path)['model']
 pretrained = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained)
@@ -49,7 +49,7 @@ criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
 
-epochs = 20
+epochs = 15
 loss_g = []
 accuracy_g = []
 

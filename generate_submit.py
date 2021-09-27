@@ -11,7 +11,7 @@ args = parser.parse_args()
 for_validation = args.v
 if for_validation:
     out_path = "./validation_results"
-    campath = "./validation_out_cam"
+    campath = "./out_cam/secondphase_scalenet101_last"
     background_path = "./Dataset/2.validation/background-mask/"
     assert os.path.exists(campath), "the cam for validation has not been generated!"
 else:
