@@ -1,6 +1,5 @@
 import os
-from threading import current_thread
-os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
+os.environ['CUDA_VISIBLE_DEVICES']='2,3'
 import torch
 import network
 import dataset
@@ -26,17 +25,18 @@ devices = args.device
 threshold = args.t
 epochs = args.epoch
 model_index = args.m
-base_lr = 0.0005
+base_lr = 0.001
 net = network.ResNet().cuda()
 
 # Get pretrained model
-resnet101 = models.resnet101(pretrained=True) 
-pretrained_dict =resnet101.state_dict()
-model_dict = net.state_dict()
-pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict} 
-model_dict.update(pretrained_dict)
+# resnet101 = models.resnet101(pretrained=True)
+net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
+# pretrained_dict =resnet101.state_dict()
+# model_dict = net.state_dict()
+# pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict} 
+# model_dict.update(pretrained_dict)
 # Load pretraiend parameters
-net.load_state_dict(model_dict)
+# net.load_state_dict(model_dict)
 
 net = torch.nn.DataParallel(net, device_ids=devices).cuda()
 # net = net.cuda()
@@ -111,8 +111,8 @@ for i in range(epochs):
     print("loss: ", running_loss / count)
     print("accuracy: ", correct / (count * batch_size))
     for tissue in ["tumor", "stroma", "normal"]:
-        print("precision for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1]))
-        print("recall for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2]))
+        print("precision for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][1] + 1e-5))
+        print("recall for", tissue, helpdic[tissue][0] / (helpdic[tissue][0] + helpdic[tissue][2] + 1e-5))
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
     if (i + 1) % 10 == 0 and (i + 1) != epochs:
@@ -144,7 +144,7 @@ for i in range(epochs):
     remember_all_label = torch.cat(remember_all_label, dim=0)
     count = len(remember_all_label)
 
-    for threshold in tqdm(np.arange(0, 1, step = 0.01)):
+    for threshold in tqdm(np.arange(0.5, 0.51, step = 0.01)):
         predict = remember_all_predict >= threshold
 
         # Calculate for the three statistics
@@ -200,17 +200,17 @@ plt.ylabel('accuracy')
 plt.xlabel('epochs')
 plt.savefig('./image/' + model_index +'_accuracy.png')
 
-fig=plt.figure()
-plt.plot(valid_accuracy)
-plt.ylabel('validation accuracy')
-plt.xlabel('epochs')
-plt.savefig('./image/' + model_index + '_validaccuracy.png')
+# fig=plt.figure()
+# plt.plot(valid_accuracy)
+# plt.ylabel('validation accuracy')
+# plt.xlabel('epochs')
+# plt.savefig('./image/' + model_index + '_validaccuracy.png')
 
-fig=plt.figure()
-plt.plot(f1_scores)
-plt.ylabel('validation mean f1 scores')
-plt.xlabel('epochs')
-plt.savefig('./image/' + model_index +'_f1mean.png')
+# fig=plt.figure()
+# plt.plot(f1_scores)
+# plt.ylabel('validation mean f1 scores')
+# plt.xlabel('epochs')
+# plt.savefig('./image/' + model_index +'_f1mean.png')
 
 # fig=plt.figure()
 # plt.plot(threshold_list)

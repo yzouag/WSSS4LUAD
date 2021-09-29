@@ -9,3 +9,4 @@
 
 CUDA_VISIBLE_DEVICES=2 python generate_valid_CAM.py
 CUDA_VISIBLE_DEVICES=2 python visualization_compare.py
+CUDA_VISIBLE_DEVICES=2 python generate_submit.py -v

@@ -11,9 +11,9 @@ import torch
 from math import inf
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2'
-# IMPORTANT! Note we use the norm in all cases.
+# IMPORTANT! Note we DO NOT use the norm in all cases.
 dataset_path = "./Dataset/2.validation/img"
-model_name = ['secondphase_scalenet152_last']
+model_name = ['secondphase_scalenet101_448_last']
 model_crop = [(96, 32)]
 
 # visualize_pick = [0, 7, 8, 9, 31, 34, 35, 39]
@@ -24,7 +24,7 @@ with open('groundtruth.json') as f:
 
 for i in range(len(model_name)):
     # net = network.ResNetCAM()
-    net = network.scalenet152_cam(structure_path='structures/scalenet152.json')
+    net = network.scalenet101_cam(structure_path='structures/scalenet101.json')
     path = "./modelstates/" + model_name[i] + ".pth"
     pretrained = torch.load(path)['model']
     pretrained = {k[7:]: v for k, v in pretrained.items()}
@@ -39,7 +39,7 @@ for i in range(len(model_name)):
     side_length = model_crop[i][0]
     stride = model_crop[i][1]
     onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((448, 448)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
         patch_size=side_length,
@@ -53,13 +53,25 @@ for i in range(len(model_name)):
 
         orig_img = np.asarray(Image.open(im_path[0]))
 
-        def tocamlist(im):
-            im = im.cuda()
-            cam_scores = net(im)
-            cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
-            return cam_scores
+        im_list = torch.vstack(im_list)
+        batch_size = 8
+        im_list = torch.split(im_list, batch_size)
+        cam_list = []
+        for ims in im_list:
+            cam_scores = net(ims.cuda())
+            # print(cam_scores.shape)
+            cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False).detach().cpu().numpy()
+            # print(cam_scores.shape)
+            cam_list.append(cam_scores)
+        cam_list = np.concatenate(cam_list)
 
-        cam_list = list(map(tocamlist, im_list))
+        # def tocamlist(im):
+        #     im = im.cuda()
+        #     cam_scores = net(im)
+        #     cam_scores = F.interpolate(cam_scores, (side_length, side_length), mode='bilinear', align_corners=False)[0].detach().cpu().numpy()
+        #     return cam_scores
+
+        # cam_list = list(map(tocamlist, im_list))
 
         sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
         sum_counter = np.zeros_like(sum_cam)
