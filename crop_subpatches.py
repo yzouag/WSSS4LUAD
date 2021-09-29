@@ -145,7 +145,7 @@ def test_crop_accuracy(score_path, big_labels_path, min_amount):
                 lower = lower_bound
                 best_lower_score = score
 
-        for upper_bound in np.arange(0.8, 0.98, 0.001):
+        for upper_bound in np.arange(0.8, 0.95, 0.001):
             true_one = gt[:, i][pred[:, i] >= upper_bound] == 1
             if len(true_one) < 1:
                 continue
@@ -173,8 +173,9 @@ def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
     The is_new here means old or new model, will be replaced later.
     """
     if is_new:
-        net = network.ResNet()
-        model_path = 'modelstates/bigmodel_best.pth'    # TODO: avoid hard code
+        # net = network.ResNet()
+        net = network.scalenet101(structure_path='structures/scalenet101.json')
+        model_path = 'modelstates/big_scalenet101_last.pth'    # TODO: avoid hard code
         pretrained = torch.load(model_path)['model']
         pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
         net.load_state_dict(pretrained_modify)
@@ -291,23 +292,23 @@ if __name__ == "__main__":
 
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    else:
-        shutil.rmtree(cut_result_path)
-        os.mkdir(cut_result_path)
+    # else:
+    #     shutil.rmtree(cut_result_path)
+    #     os.mkdir(cut_result_path)
 
     if dataset == 1:
-        file_list = []
-        for file in os.listdir(dataset_path):
-            label = file.split('-')[-1][:-4]
-            labels = [int(label[1]), int(label[4]), int(label[7])]
-            if sum(labels) > 1:
-                file_list.append((os.path.join(
-                    dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
-        process_map(crop_train_image, file_list, max_workers=6)
+        # file_list = []
+        # for file in os.listdir(dataset_path):
+        #     label = file.split('-')[-1][:-4]
+        #     labels = [int(label[1]), int(label[4]), int(label[7])]
+        #     if sum(labels) > 1:
+        #         file_list.append((os.path.join(
+        #             dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
+        # process_map(crop_train_image, file_list, max_workers=6)
 
         save_score_name = 'patch9632_train'
-        generate_image_label_score(
-            cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+        # generate_image_label_score(
+        #     cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
         with open('prediction_threshold96.json') as json_file:
             prediction_threshold = json.load(json_file)
         get_crop_label(

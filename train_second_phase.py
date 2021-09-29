@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
+os.environ['CUDA_VISIBLE_DEVICES']='2,3'
 import torch
 import network
 import dataset
@@ -21,11 +21,11 @@ args = parser.parse_args()
 batch_size = args.batch
 devices = args.device
 setting_str = args.setting
-base_lr = 0.0003
+base_lr = 0.0005
 # net = network.ResNet()
-net = network.scalenet152(structure_path='structures/scalenet152.json')
+net = network.scalenet101(structure_path='structures/scalenet101.json')
 
-path = "modelstates/scalenet152_last.pth"
+path = "modelstates/scalenet101_last.pth"
 pretrained = torch.load(path)['model']
 pretrained = {k[7:] : v for k, v in pretrained.items()}
 net.load_state_dict(pretrained)
@@ -34,9 +34,10 @@ net = torch.nn.DataParallel(net, device_ids=devices).cuda()
 net.train()
 
 TrainDataset = dataset.DoubleLabelDataset(transform=transforms.Compose([
-    transforms.Resize(224),
+    transforms.Resize((448,448)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
+    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1, hue=0.1),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
