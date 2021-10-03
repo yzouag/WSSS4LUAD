@@ -25,7 +25,7 @@ def get_neighbors(point, image, is_stroma):
     return True
 
 
-def post_process(index_and_image, save_dir):
+def color_exclusion(index_and_image, save_dir):
     image_i, image = index_and_image
 
     palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
@@ -93,18 +93,10 @@ def cut_patches(im, im_size, stride, transform):
     return torch.stack(im_list)
 
 
-def predict_big_label(image_path, im_size, stride, threshold):
+def predict_big_label(big_label_net, image_path, im_size, stride, threshold):
     result = {}
-    # load scalenet model specially for big images
-    net = network.scalenet101(structure_path='structures/scalenet101.json')
-    path = "modelstates/big_scalenet101_last.pth"
-    pretrained = torch.load(path)['model']
-    pretrained = {k[7:] : v for k, v in pretrained.items()}
-    net.load_state_dict(pretrained)
-    net.cuda()
-    net.eval()
-    print(f'Model loaded from {path} Successfully')
-
+    big_label_net.cuda()
+    big_label_net.eval()
     # load images and cut to small patches
     image_names = os.listdir(image_path)
     for image in tqdm(image_names):
@@ -114,6 +106,7 @@ def predict_big_label(image_path, im_size, stride, threshold):
                     transforms.ToTensor(),
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
         im_list = cut_patches(im, im_size=im_size, stride=stride, transform=transform).cuda()
+        
         label = [0, 0, 0]
         total_scores = []
         
@@ -121,7 +114,7 @@ def predict_big_label(image_path, im_size, stride, threshold):
         for ims in torch.split(im_list, 4):
             with torch.no_grad():
                 ims.cuda()
-                scores = torch.sigmoid(net(ims))
+                scores = torch.sigmoid(big_label_net(ims))
                 total_scores.append(scores.cpu().numpy())
         scores = np.vstack(total_scores)
 
@@ -157,8 +150,19 @@ def load_and_scale_cam(segment_cam_path, tumor_ratio=0.9, with_big_label=False):
 
 if __name__ == '__main__':
     threshold = [0.5, 0.5, 0.5]
-    predict_big_label('Dataset/2.validation/img', 225, 80, threshold)
+    
+    path = ''
+    net = network.scalenet101_cam(structure_path='structures/scalenet101.json')
+    pretrained = torch.load(path)['model']
+    pretrained = {k[7:]: v for k, v in pretrained.items()}
+    pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+    pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+
+    net.load_state_dict(pretrained)
+    print(f'Model loaded from {path} Successfully')
+    
+    predict_big_label(net, 'Dataset/2.validation/img', 225, 80, threshold)
     segment_cam_path = 'WSSS_tumor/r2n_crop_cam_npy_160_320_val/'
     img_list = load_and_scale_cam(segment_cam_path, tumor_ratio=0.9, with_big_label=True)
     save_dir_name = 'r2n_val_new'
-    process_map(partial(post_process, save_dir=save_dir_name), img_list, max_workers=6)
+    process_map(partial(color_exclusion, save_dir=save_dir_name), img_list, max_workers=6)

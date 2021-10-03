@@ -1,20 +1,15 @@
 from multiprocessing.context import Process
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2, 3'
 import numpy as np
 from PIL import Image
 from patchify import patchify
-import argparse
-from multiprocessing import Manager, Pool
-import shutil
+from multiprocessing import Manager
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 import torch
 import network
 from torchvision import transforms
 from math import ceil
-from sklearn.metrics import f1_score
-from matplotlib import pyplot as plt
 import json
 
 
@@ -250,76 +245,52 @@ def get_crop_label(score_path, threshold, save_folder):
         image.save(f'{save_folder}/{image_name[i][:-13]}{image_label[i]}.png')
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "-threshold", type=float, default=0.05, required=False,
-                        help="The threshold to infer a crop has certain type of cells")
-    parser.add_argument("-w", "--white", type=float, default=0.7, required=False,
-                        help="The threshold to use to eliminate images with white proportions")
-    parser.add_argument("-shape", default=96, type=int)
-    parser.add_argument("-stride", default=32, type=int)
-    parser.add_argument("-d", "--dataset", default=1, type=int,
-                        help="the crop dataset, 1.training, 2.validation, 3.testing", choices=[1, 2, 3])
-    parser.add_argument("-test", action='store_true', help='take the test')
-    args = parser.parse_args()
-
-    if args.test:
-        save_name = 'patch9632'
-        valid = 'valid_single_patches/'
-        generate_image_label_score(valid, save_name, num_workers=1, batch_size=64, is_new=True)
-        prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=100)
-        print(json.dumps(prediction_threshold, indent=4))
-        with open('prediction_threshold96.json', 'w') as fp:
-            json.dump(prediction_threshold, fp)
-        exit()
-
-    threshold = args.t
-    white_threshold = args.white
-    patch_shape = args.shape
-    stride = args.stride
-    dataset = args.dataset
-
-    if dataset == 1:
-        dataset_path = 'Dataset/1.training'
-        cut_result_path = "./train_single_patches"
-    elif dataset == 2:
-        valid_mask_path = 'Dataset/2.validation/mask'
-        valid_origin_path = 'Dataset/2.validation/img'
-        cut_result_path = "./valid_single_patches"
-    else:
-        dataset_path = 'Dataset/3.testing'
-        cut_result_path = "./test_single_patches"
-
+def crop_train_set():
+    dataset_path = 'Dataset/1.training'
+    cut_result_path = "./train_single_patches"
     if not os.path.exists(cut_result_path):
         os.mkdir(cut_result_path)
-    # else:
-    #     shutil.rmtree(cut_result_path)
-    #     os.mkdir(cut_result_path)
+    
+    file_list = []
+    for file in os.listdir(dataset_path):
+        label = file.split('-')[-1][:-4]
+        labels = [int(label[1]), int(label[4]), int(label[7])]
+        if sum(labels) > 1:
+            file_list.append((os.path.join(dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
+    process_map(crop_train_image, file_list, max_workers=6)
 
-    if dataset == 1:
-        # file_list = []
-        # for file in os.listdir(dataset_path):
-        #     label = file.split('-')[-1][:-4]
-        #     labels = [int(label[1]), int(label[4]), int(label[7])]
-        #     if sum(labels) > 1:
-        #         file_list.append((os.path.join(
-        #             dataset_path, file), file[:-14], white_threshold, labels, cut_result_path, patch_shape, stride))
-        # process_map(crop_train_image, file_list, max_workers=6)
+    save_score_name = 'patch9632_train'
+    generate_image_label_score(cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
+    with open('prediction_threshold96.json') as json_file:
+        prediction_threshold = json.load(json_file)
+    
+    get_crop_label(f'image_label_score/{save_score_name}.npy', prediction_threshold, 'patch9632_train')
 
-        save_score_name = 'patch9632_train'
-        # generate_image_label_score(
-        #     cut_result_path, save_score_name, num_workers=1, batch_size=64, is_new=True)
-        with open('prediction_threshold96.json') as json_file:
-            prediction_threshold = json.load(json_file)
-        get_crop_label(
-            f'image_label_score/{save_score_name}.npy', prediction_threshold, 'patch9632_train')
+def crop_valid_set():
+    valid_mask_path = 'Dataset/2.validation/mask'
+    valid_origin_path = 'Dataset/2.validation/img'
+    cut_result_path = "./valid_single_patches"
+    if not os.path.exists(cut_result_path):
+        os.mkdir(cut_result_path)
+    image_names = os.listdir(valid_mask_path)
+    for image in tqdm(image_names):
+        origin_image_path = os.path.join(valid_origin_path, image)
+        mask_image_path = os.path.join(valid_mask_path, image)
+        origin_im = np.asarray(Image.open(origin_image_path))
+        mask_im = np.asarray(Image.open(mask_image_path))
+        index = image[:2]
+        crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_result_path)
 
-    if dataset == 2:
-        image_names = os.listdir(valid_mask_path)
-        for image in tqdm(image_names):
-            origin_image_path = os.path.join(valid_origin_path, image)
-            mask_image_path = os.path.join(valid_mask_path, image)
-            origin_im = np.asarray(Image.open(origin_image_path))
-            mask_im = np.asarray(Image.open(mask_image_path))
-            index = image[:2]
-            crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_result_path)
+def crop_train_set():
+    dataset_path = 'Dataset/3.testing'
+    cut_result_path = "./test_single_patches"
+    pass
+
+def crop_test():
+    save_name = 'patch9632'
+    valid = 'valid_single_patches/'
+    generate_image_label_score(valid, save_name, num_workers=1, batch_size=64, is_new=True)
+    prediction_threshold = test_crop_accuracy(f'image_label_score/{save_name}.npy', './val_labels.npy', min_amount=100)
+    print(json.dumps(prediction_threshold, indent=4))
+    with open('prediction_threshold96.json', 'w') as fp:
+        json.dump(prediction_threshold, fp)
