@@ -4,8 +4,5 @@ network/__pycache__/
 real_test.py
 testing.ipynb
 *.npy
-*/
+__pycache__
 *.png
-!image/
-!network/
-!structures/
