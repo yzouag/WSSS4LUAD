@@ -203,7 +203,8 @@ if __name__ == "__main__":
     image_mask_path = 'Dataset/2.validation/mask'
     image_names = os.listdir(image_name_path)
     method = 'kmeans'
-    with_cam = '_cam'
+    # with_cam = '_cam'
+    with_cam = ''
     
     for i in range(30):
         im_path = os.path.join(image_name_path, image_names[i])
