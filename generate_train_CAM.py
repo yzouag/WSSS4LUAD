@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='3'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 import torch
 import network
 import dataset
@@ -16,7 +16,7 @@ from math import inf
 
 dataset_path = "./Dataset/1.training"
 
-modellist = ['secondphase_scalenet152_last']
+modellist = ['secondphase_scalenet101_224_last']
 model_crop = [(96, 32)]
 out_path = "train_pseudomask"
 if not os.path.exists(out_path):
@@ -28,7 +28,7 @@ else:
 for i in range(len(modellist)):
     model_name = modellist[i]
     # net = network.ResNetCAM()
-    net = network.scalenet152_cam(structure_path='structures/scalenet152.json')
+    net = network.scalenet101_cam(structure_path='structures/scalenet101.json')
     path = "./modelstates/" + model_name + ".pth"
     pretrained = torch.load(path)['model']
     pretrained = {k[7:] : v for k, v in pretrained.items()}
@@ -63,7 +63,7 @@ for i in range(len(modellist)):
             interpolatey = orig_img.shape[1]
 
         im_list = torch.vstack(im_list)
-        batch_size = 16
+        batch_size = 36
         im_list = torch.split(im_list, batch_size)
         cam_list = []
         for ims in im_list:

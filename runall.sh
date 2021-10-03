@@ -7,6 +7,6 @@
 # CUDA_VISIBLE_DEVICES=2 python generate_CAM.py -side 84 -stride 28 -m ce8428model_last
 # CUDA_VISIBLE_DEVICES=2 python generate_submit.py
 
-CUDA_VISIBLE_DEVICES=2 python generate_valid_CAM.py
-CUDA_VISIBLE_DEVICES=2 python visualization_compare.py
-CUDA_VISIBLE_DEVICES=2 python generate_submit.py -v
+CUDA_VISIBLE_DEVICES=1 python generate_valid_CAM.py
+CUDA_VISIBLE_DEVICES=1 python generate_submit.py -v
+CUDA_VISIBLE_DEVICES=1 python visualization_compare.py

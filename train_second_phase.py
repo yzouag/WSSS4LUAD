@@ -21,7 +21,7 @@ args = parser.parse_args()
 batch_size = args.batch
 devices = args.device
 setting_str = args.setting
-base_lr = 0.0005
+base_lr = 0.001
 # net = network.ResNet()
 net = network.scalenet101(structure_path='structures/scalenet101.json')
 
@@ -37,7 +37,7 @@ TrainDataset = dataset.DoubleLabelDataset(transform=transforms.Compose([
     transforms.Resize((448,448)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1, hue=0.1),
+    # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1, hue=0.1),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
@@ -45,7 +45,7 @@ print("Dataset", len(TrainDataset))
 TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
 TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.2)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.2)
 criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
 criteria.cuda()
@@ -87,7 +87,7 @@ for i in range(epochs):
     print("accuracy: ", correct / (count * batch_size))
     accuracy_g.append(correct / (count * batch_size))
     loss_g.append(running_loss / count)
-    if (i + 1) % 10 == 0 and (i + 1) != epochs:
+    if (i + 1) % 5 == 0 and (i + 1) != epochs:
         torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
 
 fig=plt.figure()

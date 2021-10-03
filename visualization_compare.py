@@ -39,7 +39,7 @@ def get_mIOU(mask, groundtruth, prediction):
 
 
 # model_names = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
-model_names = ['secondphase_scalenet101_448_last']
+model_names = ['ensemble']#'secondphase_scalenet101_448_2_last'
 
 img_path = 'Dataset/2.validation/img'
 gt_path = 'Dataset/2.validation/mask'
@@ -50,7 +50,8 @@ mask_path = 'Dataset/2.validation/background-mask'
 visualize_pick = np.arange(40)
 for model_name in model_names:
     for i in tqdm(visualize_pick):
-        cam_path = f'out_cam/{model_name}'
+        # cam_path = f'out_cam/{model_name}'
+        cam_path = "valid_ensemble_result"
         mask = np.asarray(Image.open(mask_path + f'/{i:02d}.png'))
         cam = np.load(os.path.join(cam_path, f'{i:02d}.npy'), allow_pickle=True).astype(np.uint8)
         groundtruth = np.asarray(Image.open(gt_path + f'/{i:02d}.png'))
