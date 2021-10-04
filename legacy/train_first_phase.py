@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='2,3'
+os.environ['CUDA_VISIBLE_DEVICES']='1,2,3'
 import torch
 import network
 import dataset
@@ -11,6 +11,8 @@ from tqdm import tqdm, trange
 import torchvision.models as models
 import matplotlib.pyplot as plt
 import argparse
+from utils.util import convertinttoonehot
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch", default=64, type=int)
@@ -22,22 +24,26 @@ batch_size = args.batch
 devices = args.device
 setting_str = args.setting
 base_lr = 0.001
-# net = network.ResNet()
-net = network.scalenet101(structure_path='structures/scalenet101.json')
+# net = network.ResNet().cuda()
+net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
+assert os.path.exists("./train_single_patches1"), "The directory train_single_patches haven't been genereated!"
 
-path = "modelstates/scalenet101_last.pth"
-pretrained = torch.load(path)['model']
-pretrained = {k[7:] : v for k, v in pretrained.items()}
-net.load_state_dict(pretrained)
-print(f'Model loaded from {path} Successfully')
+# Get pretrained model
+# resnet101 = models.resnet101(pretrained=True) 
+# pretrained_dict =resnet101.state_dict()
+# model_dict = net.state_dict()
+# pretrained_dict =  {k: v for k, v in pretrained_dict.items() if k in model_dict} 
+# model_dict.update(pretrained_dict)
+# Load pretraiend parameters
+# net.load_state_dict(model_dict)
+
 net = torch.nn.DataParallel(net, device_ids=devices).cuda()
 net.train()
 
-TrainDataset = dataset.DoubleLabelDataset(transform=transforms.Compose([
-    transforms.Resize((448,448)),
+TrainDataset = dataset.SingleLabelDataset("train_single_patches1/", transform=transforms.Compose([
+    transforms.Resize((224,224)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1, hue=0.1),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
@@ -62,19 +68,18 @@ for i in range(epochs):
     for img, label in tqdm(TrainDataloader):
         count += 1
         img = img.cuda()
-        label = label.cuda()
-        scores = net(img)
-        loss = criteria(scores, label.float())
         
-        # Use 0.5 as threshold for all classes
-        scores = torch.sigmoid(scores)
-        predict = torch.zeros_like(scores)
-        predict[scores > 0.7] = 1
-        predict[scores < 0.3] = 0
-        predict[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
-        for k in range(len(predict)):
-            if torch.equal(predict[k], label[k]):
-                correct += 1
+        scores = net(img)
+        # label = label.cuda()
+        # loss = criteria(scores, label)
+
+        onehot_label = convertinttoonehot(label).cuda()
+        loss = criteria(scores, onehot_label)
+        label = label.cuda()
+        
+        level = scores.detach().argmax(dim = 1)
+        b = level == label
+        correct += torch.sum(b).item()
 
         optimizer.zero_grad()
         loss.backward()
@@ -94,11 +99,11 @@ fig=plt.figure()
 plt.plot(loss_g)
 plt.ylabel('loss')
 plt.xlabel('epochs')
-plt.savefig('./image/loss_secondphase.png')
+plt.savefig('./image/loss.png')
 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
 
 fig=plt.figure()
 plt.plot(accuracy_g)
 plt.ylabel('accuracy')
 plt.xlabel('epochs')
-plt.savefig('./image/accuracy_secondphase.png')
+plt.savefig('./image/accuracy.png')

@@ -6,7 +6,7 @@ import png
 from PIL import Image
 import json
 
-model_names = ['secondphase_scalenet101_448_2_last'] #'secondphase_scalenet101_224_last'
+model_names = ['secondphase_scalenet101_448_2_last']
 # out_path = "valid_ensemble_result"
 # out_path = "train_ensemble_label"
 out_path = "test_out_cam"

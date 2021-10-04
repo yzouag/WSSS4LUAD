@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 import torch
-
+from utils.util import online_cut_patches
 
 class SingleLabelDataset(Dataset):
     def __init__(self, data_path_name, transform=None):
@@ -214,45 +214,3 @@ class OnlineTrainDataset(Dataset):
             im = self.transform(im)
 
         return image_path, im 
-
-def online_cut_patches(im, im_size=56, stride=28):
-    """
-    function for crop the image to subpatches, will include corner cases
-    the return position (x,y) is the up left corner of the image
-
-    Args:
-        im (np.ndarray): the image for cropping
-        im_size (int, optional): the sub-image size. Defaults to 56.
-        stride (int, optional): the pixels between two sub-images. Defaults to 28.
-
-    Returns:
-        (list, list): list of image reference and list of its corresponding positions
-    """
-    im_list = []
-    position_list = []
-
-    h, w, _ = im.shape
-    if h < im_size:
-        h_ = np.array([0])
-    else:
-        h_ = np.arange(0, h - im_size + 1, stride)
-        if h % stride != 0:
-            h_ = np.append(h_, h-im_size)
-
-    if w < im_size:
-        w_ = np.array([0])
-    else:
-        w_ = np.arange(0, w - im_size + 1, stride)
-        if w % stride != 0:
-            w_ = np.append(w_, w - im_size)
-
-    # if h_[0] < 0:
-    #     h_[0] = 0
-    # if w_[0] < 0:
-    #     w_[0] = 0
-    for i in h_:
-        for j in w_:   	
-            temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
-            im_list.append(temp)
-            position_list.append((i,j))
-    return im_list, position_list

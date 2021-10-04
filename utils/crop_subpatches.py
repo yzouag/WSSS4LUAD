@@ -46,7 +46,7 @@ def crop_valid_image(origin_im, mask_im, index, threshold, white_threshold, cut_
                             '_' + str(i) + str(j) + '_' + str(im_type) + '.png')
 
 
-def is_valid_crop(im_arr, threshold=0.5, groundtruth=True):
+def is_valid_crop(im_arr, threshold=0.9, groundtruth=True):
     """
     This function check whether the cropped sub images are valid for both the training and validation set.
     All pixels with sum value over 600 are considered as white and we remove all subcrops with white porpotion
@@ -157,10 +157,6 @@ def test_crop_accuracy(score_path, big_labels_path, min_amount):
             'upper_accuracy': best_higher_score
         }
     return threshold
-
-# def make_chunk(target_list, n):
-#     for i in range(0, len(target_list), n):
-#         yield target_list[i:i + n]
 
 def predict_image_score(l, image_list, valid, batch_size=64, is_new=False):
     """

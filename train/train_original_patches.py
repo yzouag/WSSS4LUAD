@@ -26,7 +26,7 @@ threshold = args.t
 epochs = args.epoch
 model_index = args.m
 base_lr = 0.001
-net = network.ResNet().cuda()
+# net = network.ResNet().cuda()
 
 # Get pretrained model
 # resnet101 = models.resnet101(pretrained=True)
