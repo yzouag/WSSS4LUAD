@@ -205,13 +205,16 @@ def save_high_score_train_images(scores_list, threshold):
 
     pred = []
     big_labels = []
+    image_names = []
     for i in range(len(scores_list)):
         pred.append(scores_list[i][1])
         label = scores_list[i][0][-13:-4] # this will get a string '[0, 1, 1]'
+        image_names.append(scores_list[i][0])
         big_labels.append([int(label[1]), int(label[4]), int(label[7])])
     
     pred = np.stack(pred)
     big_labels = np.stack(big_labels)
+    image_names = np.stack(image_names)
     for i in range(3):
         pred[:, i][pred[:, i] <= threshold[str(i)]['lower_bound']] = 0
         pred[:, i][pred[:, i] >= threshold[str(i)]['upper_bound']] = 1
@@ -219,15 +222,15 @@ def save_high_score_train_images(scores_list, threshold):
     
     pred = pred * big_labels
     indicies = np.where(np.all(pred != -1, axis=1))
-    image_name = scores_list[indicies][:, 0]
     image_label = pred[indicies, :].astype(np.int8).reshape(-1, 3)
+    image_names = image_names[indicies]
     
     if not os.path.exists(cut_multiple_path):
         os.mkdir(cut_multiple_path)
     
-    for i in tqdm(range(len(image_name))):
-        image = Image.open(os.path.join(cut_temp_path, image_name[i]))
-        image.save(f'{cut_multiple_path}/{image_name[i][:-13]}{image_label[i]}.png')
+    for i in tqdm(range(len(image_names))):
+        image = Image.open(os.path.join(cut_temp_path, image_names[i]))
+        image.save(f'{cut_multiple_path}/{image_names[i][:-13]}{image_label[i]}.png')
     shutil.rmtree(cut_temp_path)
     print('generate multiple label data complete')
     print(f'number of images in multiple label: {len(os.listdir(cut_multiple_path))}')
