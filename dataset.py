@@ -23,6 +23,24 @@ class SingleLabelDataset(Dataset):
         label = int(self.files[idx][-5:-4])
         return im, label
 
+class ValidationDataset(Dataset):
+    def __init__(self, data_path_name, transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(data_path_name)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+        if self.transform:
+            im = self.transform(im)
+        label = self.files[idx][-13:-4]
+        label = np.array([int(label[1]), int(label[4]), int(label[7])])
+        return im, label
+
 class DoubleLabelDataset(Dataset):
     def __init__(self, transform=None):
         self.path_s = "sample_single_patches"

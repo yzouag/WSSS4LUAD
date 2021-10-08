@@ -12,24 +12,21 @@ import shutil
 import json
 
 # IMPORTANT! Note we DO NOT use the norm in all cases.
-dataset_path = "./Dataset/3.testing/img"
-model_name = ['secondphase_scalenet101_224_last'] # 'secondphase_scalenet101_224_last'
-model_crop = [(96, 32)]
-out_path = "train_pseudomask"
 
-def generate_cam(net, dataset_path, model_name, model_crop, batch_size, out_path, mode):
+def generate_cam(net, dataset_path, model_name, model_crop, batch_size, mode):
     """
     generate the class activation map using the model pass into
 
     Args:
         net (torch.models): the classification model
-        dataset_path (string)
+        dataset_path (string): the target dataset for generating the CAM
         model_name (string): the name to store in ensemble_candidate
         model_crop (tuple): (side_length, stride)
         batch_size (int): batch to process the cam
-        out_path (string): [description]
         mode (string): three options, 'train', 'valid', 'test'
     """
+    out_path = 'train_pseudomask'
+    
     if not os.path.exists(out_path):
         os.mkdir(out_path)
     else:
@@ -41,10 +38,12 @@ def generate_cam(net, dataset_path, model_name, model_crop, batch_size, out_path
 
     side_length, stride = model_crop
 
-    onlineDataset = dataset.OnlineDataset(dataset_path, transform=transforms.Compose([
-        transforms.Resize((224,224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
+    onlineDataset = dataset.OnlineDataset(dataset_path, 
+        transform=transforms.Compose([
+            transforms.Resize((224,224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]),
         patch_size=side_length,
         stride=stride
     )
@@ -103,9 +102,9 @@ def generate_cam(net, dataset_path, model_name, model_crop, batch_size, out_path
             
             resultpath = im_path[0].split('/')[-1].split('.')[0]
             np.save(f'ensemble_candidates/{model_name}_cam_no_norm/{resultpath}.npy', norm_cam)
-            np.save(f'{out_path}/{resultpath}.npy', result_label)
+            np.save(f'{out_path}/{resultpath}.npy', result_label)  ### why we need to save this??????
 
-        if mode == 'valid':
+        if mode == 'valid':         
             with open('result/groundtruth.json') as f:
                 big_labels = json.load(f)
             big_label = big_labels[im_path[0][-6:]]

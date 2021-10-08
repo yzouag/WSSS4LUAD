@@ -22,7 +22,20 @@ When you are writing code, pay attention to the followings:
 ## Main file explained
 - `train_integrated.py` This is our main training file, which accept the doublelabeldataset and use pretrained scalenet101 to trin
 - `*original_patches.py` All of these files are related to origin image label training and testing, in another word, the big patch model
-- `dataset.py` The dataset file contains all the useful dataset
-- `legacy/` All the deprecated code
-- `image/` The accuracy and loss curves of the trained models
-- `utils/util.py` All the general purpose functions
+
+```
+│  .gitignore
+│  dataset.py	# contains all the useful dataset
+│  main.py
+│  README.md
+│  requirements.txt
+│  run.sh
+│  testing.ipynb
+├─image		# accuracy and loss curves of trained models
+├─legacy	# All the deprecated code
+├─network
+├─result
+├─structures
+├─train
+└─utils		# All the general purpose functions
+```

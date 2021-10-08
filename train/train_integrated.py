@@ -1,22 +1,26 @@
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import os
 
 def train_small_label(net, train_loader, valid_loader, optimizer, criteria, scheduler, epochs, save_every, setting_str):
     """
-    this is the doc
+    the training and validation function for small crop images
 
     Args:
-        net ([type]): [description]
-        train_loader ([type]): [description]
-        valid_loader ([type]): [description]
-        optimizer ([type]): [description]
-        criteria ([type]): [description]
-        scheduler ([type]): [description]
-        epochs ([type]): [description]
-        save_every ([type]): [description]
-        setting_str ([type]): [description]
+        net (network): the model for training
+        train_loader (dataloader): train data loader
+        valid_loader (dataloader): validation data loader
+        optimizer (optim): the optimizer for the training
+        criteria (loss): the loss function for training
+        scheduler (scheduler): training scheduler
+        epochs (int): number of training epochs
+        save_every (int): number of epochs to save one model
+        setting_str (str): the model name
     """
+    if not os.path.exists('modelstates'):
+        os.mkdir('modelstates')
+
     loss_t = []
     accuracy_t = []
     loss_v = []
