@@ -10,7 +10,7 @@ from os.path import join as osp
 from tqdm import tqdm
 
 
-def convertinttoonehot(nums_list : torch.tensor):
+def convertinttoonehot(nums_list: torch.tensor):
     dic = {0: [1, 0, 0], 1: [0, 1, 0], 2: [0, 0, 1]}
     result = np.empty((len(nums_list), 3))
     for i in range(len(nums_list)):
@@ -25,7 +25,7 @@ def sample_single_label(single_path, sample_size, result_path="sample_single_pat
     else:
         shutil.rmtree(result_path)
         os.mkdir(result_path)
-    dic = {0 : [], 1 : [], 2 : []}
+    dic = {0: [], 1: [], 2: []}
     for file in os.listdir(single_path):
         # copyfile(osp(single_path, file), osp(result_path, file))
         index = int(file[-5])
@@ -38,6 +38,7 @@ def sample_single_label(single_path, sample_size, result_path="sample_single_pat
         copyfile(osp(single_path, dic[1][k]), osp(result_path, dic[1][k]))
         copyfile(osp(single_path, dic[2][k]), osp(result_path, dic[2][k]))
     return
+
 
 def sample_double_label(double_path, result_path="sample_double_patches"):
     if not os.path.exists(result_path):
@@ -58,6 +59,7 @@ def sample_double_label(double_path, result_path="sample_double_patches"):
     #     copyfile(osp(double_path, tumor[k]), osp(result_path, tumor[k]))
     return
 
+
 def calculate_index(path):
     l = []
     for file in os.listdir(path):
@@ -66,6 +68,7 @@ def calculate_index(path):
 
     print(Counter(l))
     return
+
 
 def online_cut_patches(im, im_size=96, stride=32):
     """
@@ -99,8 +102,9 @@ def online_cut_patches(im, im_size=96, stride=32):
             w_ = np.append(w_, w - im_size)
 
     for i in h_:
-        for j in w_:   	
-            temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
+        for j in w_:
+            temp = Image.fromarray(
+                np.uint8(im[i:i+im_size, j:j+im_size, :].copy()))
             im_list.append(temp)
-            position_list.append((i,j))
+            position_list.append((i, j))
     return im_list, position_list

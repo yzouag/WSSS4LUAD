@@ -106,7 +106,7 @@ def generate_cam(net, dataset_path, model_name, model_crop, batch_size, out_path
             np.save(f'{out_path}/{resultpath}.npy', result_label)
 
         if mode == 'valid':
-            with open('groundtruth.json') as f:
+            with open('result/groundtruth.json') as f:
                 big_labels = json.load(f)
             big_label = big_labels[im_path[0][-6:]]
             
