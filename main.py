@@ -44,26 +44,29 @@ if __name__ == '__main__':
     cell_percentage = args.cell_percent
     threshold_file_name = args.threshold_file_name
 
-    if if_crop:
-        # step 1: crop valid images to small patches
-        crop_subpatches.crop_valid_set(side_length, stride, white_threshold, cell_percentage)
+    # step 1: crop valid images to small patches
+    print('crop valid images to small patches...')
+    crop_subpatches.crop_valid_set(side_length, stride, white_threshold, cell_percentage)
 
-        # step 2: use big label network predict the crops, get the best threshold
-        net = network.scalenet101(structure_path='structures/scalenet101.json')
-        model_path = 'modelstates/big_scalenet101_last.pth'
-        pretrained = torch.load(model_path)['model']
-        pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
-        net.load_state_dict(pretrained_modify)
+    # step 2: use big label network predict the crops, get the best threshold
+    net = network.scalenet101(structure_path='structures/scalenet101.json')
+    model_path = 'modelstates/big_scalenet101_last.pth'
+    pretrained = torch.load(model_path)['model']
+    pretrained_modify = {k[7:]: v for k, v in pretrained.items()}
+    net.load_state_dict(pretrained_modify)
 
-        crop_subpatches.valid_crop_test(threshold_file_name, net)
+    print('valid crop and get the threshold...')
+    crop_subpatches.valid_crop_test(threshold_file_name, net)
 
-        # step 3: crop train images
-        #   step 3.1: crop single label images
-        #   step 3.2: crop mixed label images
-        crop_subpatches.crop_train_set(white_threshold, side_length, stride)
+    # step 3: crop train images
+    #   step 3.1: crop single label images
+    #   step 3.2: crop mixed label images
+    print('crop train images')
+    crop_subpatches.crop_train_set(white_threshold, side_length, stride)
 
-        # step 4: use big label network predict the mixed-label image small crops under the threshold
-        crop_subpatches.predict_and_save_train_crops(net, threshold_file_name)
+    # step 4: use big label network predict the mixed-label image small crops under the threshold
+    print('predict train image labels')
+    crop_subpatches.predict_and_save_train_crops(net, threshold_file_name)
 
     # step 4.5 balancing the train data
 

@@ -1,8 +1,7 @@
 import os
 import numpy as np
 from PIL import Image
-# from patchify import patchify
-from util import online_cut_patches
+from utils.util import online_cut_patches
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 import torch
@@ -21,7 +20,7 @@ def crop_train_image(file_info):
     if im_arr.shape[0] < patch_shape or im_arr.shape[1] < patch_shape:
         return
 
-    patches,_ = online_cut_patches(im_arr, patch_shape, step=stride)
+    patches = online_cut_patches(im_arr, patch_shape, stride)
     
     for i in range(len(patches)):
         sub_image = patches[i]
@@ -264,7 +263,7 @@ def crop_train_set(white_threshold, side_length, stride):
         else:
             file_list.append((os.path.join(dataset_path, file), file[:-14], white_threshold, labels, cut_single_path, side_length, stride))
     print('generate crop label images...')
-    process_map(crop_train_image, file_list, max_workers=6)
+    process_map(crop_train_image, file_list, max_workers=6, chunksize=10)
 
     print('cut complete')
     print('images for single label cut: ', len(os.listdir(cut_single_path)))
@@ -315,7 +314,7 @@ def crop_valid_set(side_length, stride, white_threshold, cell_percentage):
         
         index = image[:2]
         stack_image = np.concatenate((origin_im, mask_im.reshape(mask_im.shape[0], mask_im.shape[1], 1)), axis=2)
-        patches,_ = online_cut_patches(stack_image, side_length, step=stride)
+        patches = online_cut_patches(stack_image, side_length, stride)
         for i in range(len(patches)):
             sub_image = patches[i][:, :, :3]
             label = patches[i][:, :, 3]

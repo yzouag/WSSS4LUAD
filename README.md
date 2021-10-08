@@ -39,3 +39,32 @@ When you are writing code, pay attention to the followings:
 ├─train
 └─utils		# All the general purpose functions
 ```
+
+## Main Procedures
+
+step 1: crop valid images to small patches
+
+step 2: use big label network predict the crops, get the best threshold
+
+step 3: crop train images
+
+​    step 3.1: crop single label images
+
+​    step 3.2: crop mixed label images
+
+step 4: use big label network predict the mixed-label image small crops under the threshold
+
+step 4.5 balancing the train data
+
+step 5: train small_crop network
+
+step 6: generate CAM
+
+step 6.5: generate visualization result and validation
+
+step 7: train segmentation network
+
+step 8: make segmentation prediction
+
+step 9: post processing
+

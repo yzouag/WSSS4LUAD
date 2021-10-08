@@ -4,7 +4,6 @@ import numpy as np
 import torch
 from PIL import Image
 import os
-from patchify import patchify
 from collections import Counter
 from os.path import join as osp
 from tqdm import tqdm
@@ -84,7 +83,6 @@ def online_cut_patches(im, im_size=96, stride=32):
         (list, list): list of image reference and list of its corresponding positions
     """
     im_list = []
-    position_list = []
 
     h, w, _ = im.shape
     if h < im_size:
@@ -103,8 +101,6 @@ def online_cut_patches(im, im_size=96, stride=32):
 
     for i in h_:
         for j in w_:
-            temp = Image.fromarray(
-                np.uint8(im[i:i+im_size, j:j+im_size, :].copy()))
+            temp = np.uint8(im[i:i+im_size, j:j+im_size, :].copy())
             im_list.append(temp)
-            position_list.append((i, j))
-    return im_list, position_list
+    return im_list
