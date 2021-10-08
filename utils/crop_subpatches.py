@@ -230,6 +230,8 @@ def save_high_score_train_images(scores_list, threshold):
         image = Image.open(os.path.join(cut_temp_path, image_name[i]))
         image.save(f'{cut_multiple_path}/{image_name[i][:-13]}{image_label[i]}.png')
     shutil.rmtree(cut_temp_path)
+    print('generate multiple label data complete')
+    print(f'number of images in multiple label: {len(os.listdir(cut_multiple_path))}')
 
 
 def crop_train_set(white_threshold, side_length, stride):
@@ -263,6 +265,10 @@ def crop_train_set(white_threshold, side_length, stride):
             file_list.append((os.path.join(dataset_path, file), file[:-14], white_threshold, labels, cut_single_path, side_length, stride))
     print('generate crop label images...')
     process_map(crop_train_image, file_list, max_workers=6)
+
+    print('cut complete')
+    print('images for single label cut: ', len(os.listdir(cut_single_path)))
+    print('images for multiple label cut: ', len(os.listdir(cut_multiple_path)))
 
 
 
