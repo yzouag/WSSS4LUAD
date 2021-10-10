@@ -59,32 +59,35 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
         train_loss = running_loss / len(train_loader)
         train_acc = correct / float(len(train_loader))
         scheduler.step()
+        accuracy_t.append(train_loss)
+        loss_t.append(train_acc)
 
-        with torch.no_grad():
-            net.eval()
-            running_loss = 0.0
-            running_corrects = 0
-            for img, label in tqdm(valid_loader):
-                img = img.cuda()
-                label = label.cuda()
-                scores = net(img)
-                loss = criteria(scores, label.float())
-                
-                scores = torch.sigmoid(scores)
-                predict = torch.zeros_like(scores)
-                predict[scores > 0.5] = 1
-                predict[scores <= 0.5] = 0
-                for k in range(len(predict)):
-                    if torch.equal(predict[k], label[k]):
-                        correct += 1
+        if i % 3 == 0:
+            with torch.no_grad():
+                net.eval()
+                running_loss = 0.0
+                running_corrects = 0
+                for img, label in tqdm(valid_loader):
+                    img = img.cuda()
+                    label = label.cuda()
+                    scores = net(img)
+                    loss = criteria(scores, label.float())
+                    
+                    scores = torch.sigmoid(scores)
+                    predict = torch.zeros_like(scores)
+                    predict[scores > 0.5] = 1
+                    predict[scores <= 0.5] = 0
+                    for k in range(len(predict)):
+                        if torch.equal(predict[k], label[k]):
+                            correct += 1
 
-            valid_loss = running_loss / len(valid_loader)
-            valid_acc = running_corrects / float(len(valid_loader))
+                valid_loss = running_loss / len(valid_loader)
+                valid_acc = running_corrects / float(len(valid_loader))
+                loss_v.append(valid_loss)
+                accuracy_v.append(valid_acc)
         
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid Loss: {valid_loss:.4f},  Valid Acc: {valid_acc:.4f}')
-        
-        accuracy_t.append()
-        loss_t.append()
+
         if (i + 1) % save_every == 0 and (i + 1) != epochs:
             torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
 

@@ -223,6 +223,7 @@ def save_high_score_train_images(scores_list, threshold):
     pred = pred * big_labels
     indicies = np.where(np.all(pred != -1, axis=1))
     image_label = pred[indicies, :].astype(np.int8).reshape(-1, 3)
+    image_names = image_names[indicies]
     
     if not os.path.exists(cut_multiple_path):
         os.mkdir(cut_multiple_path)
