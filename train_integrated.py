@@ -33,11 +33,13 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
     accuracy_v = []
 
     for i in range(epochs):
+        count = 0
         running_loss = 0.
         correct = 0
         net.train()
 
         for img, label in tqdm(train_loader):
+            count += 1
             img = img.cuda()
             label = label.cuda()
             scores = net(img)
@@ -57,8 +59,8 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
 
             optimizer.step()
             running_loss += loss.item()
-        train_loss = running_loss / math.floor(len(train_loader) / batch_size)
-        train_acc = correct / float(len(train_loader))
+        train_loss = running_loss / count
+        train_acc = correct / (count * batch_size)
         scheduler.step()
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
@@ -68,7 +70,9 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
                 net.eval()
                 running_loss = 0.0
                 running_corrects = 0
+                count = 0
                 for img, label in tqdm(valid_loader):
+                    count += 1
                     img = img.cuda()
                     label = label.cuda()
                     scores = net(img)
@@ -82,8 +86,8 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
                         if torch.equal(predict[k], label[k]):
                             running_corrects += 1
                     running_loss += loss.item()
-                valid_loss = running_loss / math.floor(len(valid_loader) / batch_size)
-                valid_acc = running_corrects / float(len(valid_loader))
+                valid_loss = running_loss / count
+                valid_acc = running_corrects / (count * batch_size)
                 loss_v.append(valid_loss)
                 accuracy_v.append(valid_acc)
         
