@@ -47,10 +47,11 @@ def sample_double_label(double_path, result_path="sample_double_patches"):
         os.mkdir(result_path)
     tumor = []
     for file in os.listdir(double_path):
-        fileindex = (file[-11: -4])
-        if fileindex == "[1 0 0]":
-            tumor.append(file)
-        elif fileindex == "[0 1 0]" or fileindex == "[1 1 0]":
+        fileindex = (file[-13: -4])
+        if fileindex == "[1, 0, 0]":
+            # tumor.append(file)
+            continue
+        elif fileindex == "[0, 1, 0]" or fileindex == "[1, 1, 0]":
             copyfile(osp(double_path, file), osp(result_path, file))
 
     # select_index = np.random.choice(len(tumor), 7000, replace=False)
@@ -62,7 +63,7 @@ def sample_double_label(double_path, result_path="sample_double_patches"):
 def calculate_index(path):
     l = []
     for file in os.listdir(path):
-        fileindex = (file[-11: -4])
+        fileindex = (file[-13: -4])
         l.append(fileindex)
 
     print(Counter(l))

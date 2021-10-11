@@ -43,7 +43,7 @@ class ValidationDataset(Dataset):
 
 class DoubleLabelDataset(Dataset):
     def __init__(self, transform=None):
-        self.path_s = "sample_single_patches"
+        self.path_s = "train_single_label_patches"
         self.path_d = "sample_double_patches"
         self.files_s = os.listdir(self.path_s)
         self.files_d = os.listdir(self.path_d)
@@ -53,21 +53,18 @@ class DoubleLabelDataset(Dataset):
         return len(self.files_s) + len(self.files_d)
 
     def __getitem__(self, idx):
-        if idx < 30000:
+        if idx < len(self.files_s):
             image_path = os.path.join(self.path_s, self.files_s[idx])
-            im = Image.open(image_path)
-            if self.transform:
-                im = self.transform(im)
-            label = np.array([0,0,0])
-            activate = int(self.files_s[idx][-5])
-            label[activate] = 1
+            label = np.array([int(self.files_s[idx][-12]), int(self.files_s[idx][-9]), int(self.files_s[idx][-6])])
         else:
-            idx -= 30000
+            idx -= len(self.files_s)
             image_path = os.path.join(self.path_d, self.files_d[idx])
-            im = Image.open(image_path)
-            if self.transform:
-                im = self.transform(im)
-            label = np.array([int(self.files_d[idx][-10]), int(self.files_d[idx][-8]), int(self.files_d[idx][-6])])
+            label = np.array([int(self.files_d[idx][-12]), int(self.files_d[idx][-9]), int(self.files_d[idx][-6])])
+
+        im = Image.open(image_path)
+        if self.transform:
+            im = self.transform(im)
+        
         return im, torch.tensor(label, requires_grad=False)
 
 class DoubleValidDataset(Dataset):

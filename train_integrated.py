@@ -7,8 +7,9 @@ from torchvision import transforms
 import network
 import dataset
 from torch.utils.data import DataLoader
+import math
 
-def train_small_label(net, train_loader, valid_loader, optimizer, criteria, scheduler, epochs, save_every, setting_str):
+def train_small_label(net, train_loader, valid_loader, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size):
     """
     the training and validation function for small crop images
 
@@ -56,7 +57,7 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
 
             optimizer.step()
             running_loss += loss.item()
-        train_loss = running_loss / len(train_loader)
+        train_loss = running_loss / math.floor(len(train_loader) / batch_size)
         train_acc = correct / float(len(train_loader))
         scheduler.step()
         accuracy_t.append(train_loss)
@@ -79,9 +80,9 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
                     predict[scores <= 0.5] = 0
                     for k in range(len(predict)):
                         if torch.equal(predict[k], label[k]):
-                            correct += 1
-
-                valid_loss = running_loss / len(valid_loader)
+                            running_corrects += 1
+                    running_loss += loss.item()
+                valid_loss = running_loss / math.floor(len(valid_loader) / batch_size)
                 valid_acc = running_corrects / float(len(valid_loader))
                 loss_v.append(valid_loss)
                 accuracy_v.append(valid_acc)
@@ -125,7 +126,7 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch", default=64, type=int)
+    parser.add_argument("--batch", default=24, type=int)
     parser.add_argument("-epoch", default=30, type=int)
     parser.add_argument("-lr", default=0.001, type=float)
     parser.add_argument("-resize", default=448, type=int)
@@ -146,7 +147,7 @@ if __name__ == '__main__':
     devices = args.device
     setting_str = args.m
 
-    net = network.scalenet101(structure_path='../structures/scalenet101.json', ckpt='../weights/scalenet101.pth')
+    net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     transform = transforms.Compose([
         transforms.Resize((resize, resize)),
@@ -161,7 +162,7 @@ if __name__ == '__main__':
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
     
-    ValidDataset = dataset.ValidationDataset(transform=transform)
+    ValidDataset = dataset.ValidationDataset("valid_patches", transform=transform)
     print("valid Dataset", len(ValidDataset))
     ValidDataloader = DataLoader(ValidDataset, batch_size=batch_size, num_workers=2, drop_last=True)
 
@@ -170,4 +171,4 @@ if __name__ == '__main__':
     criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
     criteria.cuda()
 
-    train_small_label(net, TrainDataloader, ValidDataloader, optimizer, criteria, scheduler, epochs, save_every, setting_str)
+    train_small_label(net, TrainDataloader, ValidDataloader, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size)

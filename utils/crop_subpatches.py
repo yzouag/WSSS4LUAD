@@ -230,7 +230,7 @@ def save_high_score_train_images(scores_list, threshold):
     
     for i in tqdm(range(len(image_names))):
         image = Image.open(os.path.join(cut_temp_path, image_names[i]))
-        image.save(f'{cut_multiple_path}/{image_names[i][:-13]}{image_label[i]}.png')
+        image.save(f'{cut_multiple_path}/{image_names[i][:-13]}{list(image_label[i])}.png')
     shutil.rmtree(cut_temp_path)
     print('generate multiple label data complete')
     print(f'number of images in multiple label: {len(os.listdir(cut_multiple_path))}')
