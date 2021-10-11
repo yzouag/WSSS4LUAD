@@ -6,9 +6,9 @@ import torch
 from utils.util import online_cut_patches
 
 class SingleLabelDataset(Dataset):
-    def __init__(self, data_path_name, transform=None):
-        self.path = data_path_name
-        self.files = os.listdir(data_path_name)
+    def __init__(self, transform=None):
+        self.path = "train_single_label_patches"
+        self.files = os.listdir(self.path)
         self.transform = transform
 
     def __len__(self):
@@ -17,11 +17,10 @@ class SingleLabelDataset(Dataset):
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
         im = Image.open(image_path)
-        # im = im / 255 # convert to 0-1 scale
         if self.transform:
             im = self.transform(im)
-        label = int(self.files[idx][-5:-4])
-        return im, label
+        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
+        return im, torch.tensor(label, requires_grad=False)
 
 class ValidationDataset(Dataset):
     def __init__(self, data_path_name, transform=None):

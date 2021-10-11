@@ -47,9 +47,9 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
             
             scores = torch.sigmoid(scores)
             predict = torch.zeros_like(scores)
-            predict[scores > 0.7] = 1
-            predict[scores < 0.3] = 0
-            predict[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
+            predict[scores > 0.5] = 1
+            predict[scores < 0.5] = 0
+            # predict[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
             for k in range(len(predict)):
                 if torch.equal(predict[k], label[k]):
                     correct += 1
@@ -153,20 +153,25 @@ if __name__ == '__main__':
 
     net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
-    transform = transforms.Compose([
+    train_transform = transforms.Compose([
         transforms.Resize((resize, resize)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+    val_transform = transforms.Compose([
+        transforms.Resize((resize, resize)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
-    TrainDataset = dataset.DoubleLabelDataset(transform=transform)
+    TrainDataset = dataset.DoubleLabelDataset(transform=train_transform)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
     
-    ValidDataset = dataset.ValidationDataset("valid_patches", transform=transform)
+    ValidDataset = dataset.ValidationDataset("valid_patches", transform=val_transform)
     print("valid Dataset", len(ValidDataset))
     ValidDataloader = DataLoader(ValidDataset, batch_size=batch_size, num_workers=2, drop_last=True)
 
