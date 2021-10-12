@@ -31,6 +31,7 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
     accuracy_t = []
     loss_v = []
     accuracy_v = []
+    best_val = 0
 
     for i in range(epochs):
         count = 0
@@ -65,31 +66,35 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
 
-        if i % 3 == 0:
-            with torch.no_grad():
-                net.eval()
-                running_loss = 0.0
-                running_corrects = 0
-                count = 0
-                for img, label in tqdm(valid_loader):
-                    count += 1
-                    img = img.cuda()
-                    label = label.cuda()
-                    scores = net(img)
-                    loss = criteria(scores, label.float())
-                    
-                    scores = torch.sigmoid(scores)
-                    predict = torch.zeros_like(scores)
-                    predict[scores > 0.5] = 1
-                    predict[scores <= 0.5] = 0
-                    for k in range(len(predict)):
-                        if torch.equal(predict[k], label[k]):
-                            running_corrects += 1
-                    running_loss += loss.item()
-                valid_loss = running_loss / count
-                valid_acc = running_corrects / (count * batch_size)
-                loss_v.append(valid_loss)
-                accuracy_v.append(valid_acc)
+        # if i % 3 == 0:
+        with torch.no_grad():
+            net.eval()
+            running_loss = 0.0
+            running_corrects = 0
+            count = 0
+            for img, label in tqdm(valid_loader):
+                count += 1
+                img = img.cuda()
+                label = label.cuda()
+                scores = net(img)
+                loss = criteria(scores, label.float())
+                
+                scores = torch.sigmoid(scores)
+                predict = torch.zeros_like(scores)
+                predict[scores > 0.5] = 1
+                predict[scores <= 0.5] = 0
+                for k in range(len(predict)):
+                    if torch.equal(predict[k], label[k]):
+                        running_corrects += 1
+                running_loss += loss.item()
+            valid_loss = running_loss / count
+            valid_acc = running_corrects / (count * batch_size)
+            loss_v.append(valid_loss)
+            accuracy_v.append(valid_acc)
+            if valid_acc > best_val:
+                print("Updating the best model...........")
+                best_val = valid_acc
+                torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_best.pth")
         
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid Loss: {valid_loss:.4f},  Valid Acc: {valid_acc:.4f}')
 
@@ -131,10 +136,10 @@ def train_small_label(net, train_loader, valid_loader, optimizer, criteria, sche
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", default=24, type=int)
-    parser.add_argument("-epoch", default=30, type=int)
+    parser.add_argument("-epoch", default=15, type=int)
     parser.add_argument("-lr", default=0.001, type=float)
     parser.add_argument("-resize", default=448, type=int)
-    parser.add_argument("-step", default=10, type=int)
+    parser.add_argument("-step", default=5, type=int)
     parser.add_argument("-save_every", default=10, type=int, help="how often to save a model while training")
     parser.add_argument("-gamma", default=0.1, type=float)
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
