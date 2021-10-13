@@ -4,52 +4,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 import png
 from PIL import Image
-
-
-def calculate_IOU(pred, real):
-    """
-    this test is on a single image, and the number of clusters are the number in groundtruth
-    thus, if prediction has three classes but gt has 2, mean will only divide by 2
-
-    Returns:
-        float: mIOU score
-    """
-    score = 0
-    # num_cluster = 0
-    for i in [0, 1, 2]:
-        if i in pred:
-            # num_cluster += 1
-            intersection = sum(np.logical_and(pred == i, real == i))
-            union = sum(np.logical_or(pred == i, real == i))
-            score += intersection/union
-    num_cluster = len(np.unique(real))
-    return score/num_cluster
-
-
-def get_mIOU(mask, groundtruth, prediction):
-    """
-    in this mIOU calculation, the mask will be excluded
-    """
-    prediction = np.reshape(prediction, (-1))
-    groundtruth = groundtruth.reshape(-1)
-    mask = mask.reshape(-1)
-    length = len(prediction)
-
-    after_mask_pred = []
-    after_mask_true = []
-    for i in range(length):
-        if mask[i] == 0:
-            after_mask_true.append(groundtruth[i])
-            after_mask_pred.append(prediction[i])
-
-    after_mask_pred = np.array(after_mask_pred)
-    after_mask_true = np.array(after_mask_true)
-    score = calculate_IOU(after_mask_pred, after_mask_true)
-    return score
-
-
-# model_names = ['secondphase_ep10', 'model_last', '9632_ep10', '01_best']
-# model_names = ['ensemble'] #'secondphase_scalenet101_448_2_last'
+from metric import get_mIOU
 
 def visualize_result(model_names):
     """
