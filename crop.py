@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '4,6'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '4,6'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
