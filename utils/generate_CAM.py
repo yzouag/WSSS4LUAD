@@ -111,7 +111,7 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
                 # np.save(f'{out_path}/{resultpath}.npy', result_label)  ### why we need to save this??????
 
             if mode == 'valid':         
-                with open('result/groundtruth.json') as f:
+                with open('groundtruth.json') as f:
                     big_labels = json.load(f)
                 big_label = big_labels[im_path[0][-6:]]
                 

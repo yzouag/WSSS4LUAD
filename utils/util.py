@@ -70,7 +70,7 @@ def calculate_index(path):
     return
 
 
-def online_cut_patches(im, im_size=96, stride=32):
+def self_designed_patchify(im, im_size=96, stride=32):
     """
     function for crop the image to subpatches, will include corner cases
     the return position (x,y) is the up left corner of the image
@@ -105,3 +105,39 @@ def online_cut_patches(im, im_size=96, stride=32):
             temp = np.uint8(im[i:i+im_size, j:j+im_size, :].copy())
             im_list.append(temp)
     return im_list
+
+def online_cut_patches(im, im_size=96, stride=32):
+    """
+    function for crop the image to subpatches, will include corner cases
+    the return position (x,y) is the up left corner of the image
+    Args:
+        im (np.ndarray): the image for cropping
+        im_size (int, optional): the sub-image size. Defaults to 56.
+        stride (int, optional): the pixels between two sub-images. Defaults to 28.
+    Returns:
+        (list, list): list of image reference and list of its corresponding positions
+    """
+    im_list = []
+    position_list = []
+
+    h, w, _ = im.shape
+    if h < im_size:
+        h_ = np.array([0])
+    else:
+        h_ = np.arange(0, h - im_size + 1, stride)
+        if h % stride != 0:
+            h_ = np.append(h_, h-im_size)
+
+    if w < im_size:
+        w_ = np.array([0])
+    else:
+        w_ = np.arange(0, w - im_size + 1, stride)
+        if w % stride != 0:
+            w_ = np.append(w_, w - im_size)
+
+    for i in h_:
+        for j in w_:   	
+            temp = Image.fromarray(np.uint8(im[i:i+im_size,j:j+im_size,:].copy()))
+            im_list.append(temp)
+            position_list.append((i,j))
+    return im_list, position_list

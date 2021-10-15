@@ -29,7 +29,7 @@ from utils.generate_CAM import generate_cam
 #     """
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch", default=24, type=int)
+    parser.add_argument("-batch", default=24, type=int)
     parser.add_argument("-epoch", default=15, type=int)
     parser.add_argument("-lr", default=0.001, type=float)
     parser.add_argument("-resize", default=448, type=int)
@@ -148,7 +148,13 @@ if __name__ == '__main__':
         #     valid_acc = running_corrects / (count * batch_size)
         #     loss_v.append(valid_loss)
         #     accuracy_v.append(valid_acc)
-        generate_cam(net, setting_str, (side_length, side_length//3), batch_size, 'valid', resize)
+        net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
+        pretrained = net.state_dict()
+        pretrained = {k[7:]: v for k, v in pretrained.items()}
+        pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+        pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+        net_cam.load_state_dict(pretrained)
+        generate_cam(net_cam, setting_str, tuple((side_length, side_length//3)), batch_size, 'valid', resize)
         valid_image_path = f'valid_out_cam/{setting_str}'
         valid_iou = get_overall_valid_score(valid_image_path)
         iou_v.append(valid_iou)
