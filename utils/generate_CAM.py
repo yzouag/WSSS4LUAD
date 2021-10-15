@@ -13,7 +13,7 @@ import json
 
 # IMPORTANT! Note we DO NOT use the norm in all cases.
 
-def generate_cam(net, model_name, model_crop, batch_size, mode):
+def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
     """
     generate the class activation map using the model pass into
 
@@ -24,14 +24,13 @@ def generate_cam(net, model_name, model_crop, batch_size, mode):
         batch_size (int): batch to process the cam
         mode (string): three options, 'train', 'valid', 'test'
     """
-    out_path = 'train_pseudomask'
+    # out_path = 'train_pseudomask'
     
-    if not os.path.exists(out_path):
-        os.mkdir(out_path)
-    else:
-        shutil.rmtree(out_path)
-        os.mkdir(out_path)
-
+    # if not os.path.exists(out_path):
+    #     os.mkdir(out_path)
+    # else:
+    #     shutil.rmtree(out_path)
+    #     os.mkdir(out_path)
     net.cuda()
     net.eval()
 
@@ -46,7 +45,7 @@ def generate_cam(net, model_name, model_crop, batch_size, mode):
 
     onlineDataset = dataset.OnlineDataset(dataset_path, 
         transform=transforms.Compose([
-            transforms.Resize((224,224)),
+            transforms.Resize((resize,resize)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ]),
@@ -104,12 +103,12 @@ def generate_cam(net, model_name, model_crop, batch_size, mode):
                 if not os.path.exists('ensemble_candidates'):
                     os.mkdir('ensemble_candidates')
 
-                if not os.path.exists(f'ensemble_candidates/{model_name}_cam_no_norm'):
-                    os.mkdir(f'ensemble_candidates/{model_name}_cam_no_norm')
+                if not os.path.exists(f'ensemble_candidates/{model_name}_cam'):
+                    os.mkdir(f'ensemble_candidates/{model_name}_cam')
                 
                 resultpath = im_path[0].split('/')[-1].split('.')[0]
-                np.save(f'ensemble_candidates/{model_name}_cam_no_norm/{resultpath}.npy', norm_cam)
-                np.save(f'{out_path}/{resultpath}.npy', result_label)  ### why we need to save this??????
+                np.save(f'ensemble_candidates/{model_name}_cam/{resultpath}.npy', norm_cam)
+                # np.save(f'{out_path}/{resultpath}.npy', result_label)  ### why we need to save this??????
 
             if mode == 'valid':         
                 with open('result/groundtruth.json') as f:
@@ -121,16 +120,16 @@ def generate_cam(net, model_name, model_crop, batch_size, mode):
                         norm_cam[k, :, :] = -inf
                 result_label = norm_cam.argmax(axis=0)
 
-                if not os.path.exists('out_cam'):
-                    os.mkdir('out_cam')
+                if not os.path.exists('valid_out_cam'):
+                    os.mkdir('valid_out_cam')
 
                 # if not os.path.exists(f'out_cam/{model_name}_cam_nonorm'):
                 #     os.mkdir(f'out_cam/{model_name}_cam_nonorm')
                 # np.save(f'out_cam/{model_name}_cam_nonorm/{im_path[0][-6:-4]}.npy', norm_cam)
 
-                if not os.path.exists(f'out_cam/{model_name}'):
-                    os.mkdir(f'out_cam/{model_name}')
-                np.save(f'out_cam/{model_name}/{im_path[0][-6:-4]}.npy', result_label)
+                if not os.path.exists(f'valid_out_cam/{model_name}'):
+                    os.mkdir(f'valid_out_cam/{model_name}')
+                np.save(f'valid_out_cam/{model_name}/{im_path[0][-6:-4]}.npy', result_label)
 
             if mode == 'test':
                 result_label = norm_cam.argmax(axis=0)

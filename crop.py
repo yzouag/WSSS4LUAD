@@ -1,7 +1,7 @@
 import argparse
 import dataset
 import network
-from utils import crop_subpatches, generate_CAM, visualization
+from utils import crop_subpatches, generate_CAM, visualization, util
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     print('predict train image labels')
     crop_subpatches.predict_and_save_train_crops(net, threshold_file_name)
 
-    
+    util.sample_double_label('./train_multiple_label_patches')
     # step 6: generate CAM
     # dataset_path = './Dataset/2.validation/img'
     # model_name = 'secondphase_scalenet101_224_last'

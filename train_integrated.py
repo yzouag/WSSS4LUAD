@@ -5,135 +5,28 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
-
 from torchvision import transforms
 import network
 import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
-
 from utils.generate_CAM import generate_cam
 
-def train_small_label(net, train_loader, valid_side_length, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size):
-    """
-    the training and validation function for small crop images
+# def train_small_label(net, train_loader, valid_side_length, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size):
+#     """
+#     the training and validation function for small crop images
 
-    Args:
-        net (network): the model for training
-        train_loader (dataloader): train data loader
-        valid_side_length (int): the side length of the valid image crop
-        optimizer (optim): the optimizer for the training
-        criteria (loss): the loss function for training
-        scheduler (scheduler): training scheduler
-        epochs (int): number of training epochs
-        save_every (int): number of epochs to save one model
-        setting_str (str): the model name
-    """
-    if not os.path.exists('modelstates'):
-        os.mkdir('modelstates')
-
-    loss_t = []
-    accuracy_t = []
-    iou_v = []
-    best_val = 0
-
-    for i in range(epochs):
-        count = 0
-        running_loss = 0.
-        correct = 0
-        net.train()
-
-        for img, label in tqdm(train_loader):
-            count += 1
-            img = img.cuda()
-            label = label.cuda()
-            scores = net(img)
-            loss = criteria(scores, label.float())
-            
-            scores = torch.sigmoid(scores)
-            predict = torch.zeros_like(scores)
-            predict[scores > 0.5] = 1
-            predict[scores < 0.5] = 0
-            # predict[torch.logical_and(scores > 0.3, scores < 0.7)] = -1
-            for k in range(len(predict)):
-                if torch.equal(predict[k], label[k]):
-                    correct += 1
-
-            optimizer.zero_grad()
-            loss.backward()
-
-            optimizer.step()
-            running_loss += loss.item()
-        train_loss = running_loss / count
-        train_acc = correct / (count * batch_size)
-        scheduler.step()
-        accuracy_t.append(train_loss)
-        loss_t.append(train_acc)
-
-        # # if i % 3 == 0:
-        # with torch.no_grad():
-        #     net.eval()
-        #     running_loss = 0.0
-        #     running_corrects = 0
-        #     count = 0
-        #     for img, label in tqdm(valid_loader):
-        #         count += 1
-        #         img = img.cuda()
-        #         label = label.cuda()
-        #         scores = net(img)
-        #         loss = criteria(scores, label.float())
-                
-        #         scores = torch.sigmoid(scores)
-        #         predict = torch.zeros_like(scores)
-        #         predict[scores > 0.5] = 1
-        #         predict[scores <= 0.5] = 0
-        #         for k in range(len(predict)):
-        #             if torch.equal(predict[k], label[k]):
-        #                 running_corrects += 1
-        #         running_loss += loss.item()
-        #     valid_loss = running_loss / count
-        #     valid_acc = running_corrects / (count * batch_size)
-        #     loss_v.append(valid_loss)
-        #     accuracy_v.append(valid_acc)
-        generate_cam(net, setting_str, (valid_side_length, valid_side_length//3), batch_size, 'valid')
-        valid_image_path = f'out_cam/{setting_str}'
-        valid_iou = get_overall_valid_score(valid_image_path)
-        iou_v.append(valid_iou)
-        
-        if valid_iou > best_val:
-            print("Updating the best model...........")
-            best_val = valid_iou
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_best.pth")
-    
-        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
-
-        if (i + 1) % save_every == 0 and (i + 1) != epochs:
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
-
-    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
-
-    plt.figure(1)
-    plt.plot(loss_t)
-    plt.ylabel('loss')
-    plt.xlabel('epochs')
-    plt.title('train loss')
-    plt.savefig('./image/train_loss.png')
-    plt.close()
-
-    plt.figure(2)
-    plt.plot(accuracy_t)
-    plt.ylabel('accuracy')
-    plt.xlabel('epochs')
-    plt.title('train accuracy')
-    plt.savefig('./image/train_accuracy.png')
-
-    plt.figure(3)
-    plt.plot(iou_v)
-    plt.ylabel('accuracy')
-    plt.xlabel('epochs')
-    plt.title('valid accuracy')
-    plt.savefig('./image/valid_iou.png')
-
+#     Args:
+#         net (network): the model for training
+#         train_loader (dataloader): train data loader
+#         valid_side_length (int): the side length of the valid image crop
+#         optimizer (optim): the optimizer for the training
+#         criteria (loss): the loss function for training
+#         scheduler (scheduler): training scheduler
+#         epochs (int): number of training epochs
+#         save_every (int): number of epochs to save one model
+#         setting_str (str): the model name
+#     """
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", default=24, type=int)
@@ -191,4 +84,105 @@ if __name__ == '__main__':
     side_length = np.asarray(Image.open(valid_image_path)).shape[0]
     print('side length: ', side_length)
 
-    train_small_label(net, TrainDataloader, side_length, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size)
+    if not os.path.exists('modelstates'):
+        os.mkdir('modelstates')
+
+    loss_t = []
+    accuracy_t = []
+    iou_v = []
+    best_val = 0
+
+    for i in range(epochs):
+        count = 0
+        running_loss = 0.
+        correct = 0
+        net.train()
+
+        for img, label in tqdm(TrainDataloader):
+            count += 1
+            img = img.cuda()
+            label = label.cuda()
+            scores = net(img)
+            loss = criteria(scores, label.float())
+            
+            scores = torch.sigmoid(scores)
+            predict = torch.zeros_like(scores)
+            predict[scores > 0.5] = 1
+            predict[scores < 0.5] = 0
+            for k in range(len(predict)):
+                if torch.equal(predict[k], label[k]):
+                    correct += 1
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        train_loss = running_loss / count
+        train_acc = correct / (count * batch_size)
+        scheduler.step()
+        accuracy_t.append(train_loss)
+        loss_t.append(train_acc)
+
+        # # if i % 3 == 0:
+        # with torch.no_grad():
+        #     net.eval()
+        #     running_loss = 0.0
+        #     running_corrects = 0
+        #     count = 0
+        #     for img, label in tqdm(valid_loader):
+        #         count += 1
+        #         img = img.cuda()
+        #         label = label.cuda()
+        #         scores = net(img)
+        #         loss = criteria(scores, label.float())
+                
+        #         scores = torch.sigmoid(scores)
+        #         predict = torch.zeros_like(scores)
+        #         predict[scores > 0.5] = 1
+        #         predict[scores <= 0.5] = 0
+        #         for k in range(len(predict)):
+        #             if torch.equal(predict[k], label[k]):
+        #                 running_corrects += 1
+        #         running_loss += loss.item()
+        #     valid_loss = running_loss / count
+        #     valid_acc = running_corrects / (count * batch_size)
+        #     loss_v.append(valid_loss)
+        #     accuracy_v.append(valid_acc)
+        generate_cam(net, setting_str, (side_length, side_length//3), batch_size, 'valid', resize)
+        valid_image_path = f'valid_out_cam/{setting_str}'
+        valid_iou = get_overall_valid_score(valid_image_path)
+        iou_v.append(valid_iou)
+        
+        if valid_iou > best_val:
+            print("Updating the best model..........................................")
+            best_val = valid_iou
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_best.pth")
+    
+        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
+
+        if (i + 1) % save_every == 0 and (i + 1) != epochs:
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
+
+    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
+
+    plt.figure(1)
+    plt.plot(loss_t)
+    plt.ylabel('loss')
+    plt.xlabel('epochs')
+    plt.title('train loss')
+    plt.savefig('./image/train_loss.png')
+    plt.close()
+
+    plt.figure(2)
+    plt.plot(accuracy_t)
+    plt.ylabel('accuracy')
+    plt.xlabel('epochs')
+    plt.title('train accuracy')
+    plt.savefig('./image/train_accuracy.png')
+
+    plt.figure(3)
+    plt.plot(iou_v)
+    plt.ylabel('accuracy')
+    plt.xlabel('epochs')
+    plt.title('valid accuracy')
+    plt.savefig('./image/valid_iou.png')
