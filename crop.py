@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-side_length', default=96, type=int, help='crop size')
     parser.add_argument('-stride', type=int, default=32, help='crop step size')
-    parser.add_argument('-white_threshold', type=int, default=0.9, help='the threshold for asserting the pixel is white')
+    parser.add_argument('-white_threshold', type=float, default=0.9, help='the threshold for asserting the pixel is white')
     parser.add_argument('-cell_percent', type=float, default=0.1, help='the threshold for asserting one image contain certain label cells')
     parser.add_argument('-threshold_file_name', type=str, default='prediction_threshold', help='the name of the threshold file')
     args = parser.parse_args()

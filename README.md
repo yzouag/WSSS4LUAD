@@ -68,3 +68,11 @@ step 8: make segmentation prediction
 
 step 9: post processing
 
+## crop images
+
+```bash
+python crop_single.py --side_length 128 --stride 32 --white_threshold 0.9
+```
+
+
+

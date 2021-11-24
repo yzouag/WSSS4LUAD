@@ -243,8 +243,8 @@ def crop_train_set(white_threshold, side_length, stride):
     are extremely unbalanced. Now the patchify is deprecated.
 
     Args:
-        white_threshold (int): rgb colors from 0~255, add up together
-        side_length (int): the size of the image
+        white_threshold (int): the proportion of white pixels that will treat the crop as blank. WHITE >= 600 for the sum of rgb values
+        side_length (int): the size of the crop
         stride (int): step for each crop
     """
     dataset_path = 'Dataset/1.training'
