@@ -125,6 +125,7 @@ class ScaleNetCAM(nn.Module):
         x4 = self.layer4(x3)
 
         result = self.fc1(x4)
+        result = F.relu(result)
         result = self.fc2(result)
 
         return result

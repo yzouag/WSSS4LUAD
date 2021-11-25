@@ -128,6 +128,7 @@ class ScaleNet(nn.Module):
         result = self.pool(x)
         result = torch.flatten(result, start_dim=1)
         result = self.fc1(result)
+        result =F.relu(result)
         result = self.fc2(result)
 
         return result

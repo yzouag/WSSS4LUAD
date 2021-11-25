@@ -1,78 +1,54 @@
 # WSSS4LUAD
 
-**IMPORTANT NOTES!**
-When you are writing code, pay attention to the followings:
 
-- Currently we will only use one phase training rather than two phase, the old training file are dumped to legacy for reference only and the new training file is called `train_integrated.py`
-- All of the models currently using are scalenet101, it is located in the `network` folder
-- Avoid hard code! Always use the argparser to modulate the hyperparameters! Be careful! There are loads of them!
-- Please put other useful functions in `utils.util.py`
-- Some data folder names are *strictly reserved* for specific purpose! like `train_single_patches`, do not use it for other purposes!
+## baseline
+
+https://arxiv.org/pdf/2110.08048.pdf
 
 
 
-## Reserved folder names
-
-- `sample_single_label_patches` it is where the doubledataset fetch the single_label images
-- `sample_multiple_label_patches` it is where the doubledataset fetch the double_label images
-- `train_single_label_patches` it is the originally cutted single_label images, it might be the same with sample_single_patches if we use only one-phase training
-- `train_multiple_label_patches` it is the originally cutted double_label images, we need to filter out the useful labels to `sample_double_patches`
-- `valid_patches` it is where small crops of validation images
-
-## Main file explained
-- `train_integrated.py` This is our main training file, which accept the doublelabeldataset and use pretrained scalenet101 to trin
-- `*original_patches.py` All of these files are related to origin image label training and testing, in another word, the big patch model
-
-```
-│  .gitignore
-│  dataset.py	# contains all the useful dataset
-│  main.py
-│  README.md
-│  requirements.txt
-│  run.sh
-│  testing.ipynb
-├─image		# accuracy and loss curves of trained models
-├─legacy	# All the deprecated code
-├─network
-├─result
-├─structures
-├─train
-└─utils		# All the general purpose functions
-```
-
-## Main Procedures
-
-step 1: crop valid images to small patches
-
-step 2: use big label network predict the crops, get the best threshold
-
-step 3: crop train images
-
-​    step 3.1: crop single label images
-
-​    step 3.2: crop mixed label images
-
-step 4: use big label network predict the mixed-label image small crops under the threshold
-
-step 4.5 balancing the train data
-
-step 5: train small_crop network
-
-step 6: generate CAM
-
-step 6.5: generate visualization result and validation
-
-step 7: train segmentation network
-
-step 8: make segmentation prediction
-
-step 9: post processing
-
-## crop images
-
-```bash
-python crop_single.py --side_length 128 --stride 32 --white_threshold 0.9
-```
+## project structure
 
 
 
+## model design
+
+### backbone [`network/wide_resnet_cam.py`, `network/scalenet_cam.py`]
+1.  add wide resnet-38 for fair comparision (verify the next modifications based on it, and apply scalenet after all settings are ready)
+
+2.  multi-scale feature map fusion (concat layer2, layer3, layer4 before fc)
+
+### training settings: [`train.py`]
+
+**require modification!**
+
+#### classification
+
+- resolution of the patches is 224 × 224
+- batch size is set to 20
+- training epochs is set to 20
+- data augmentation: random horizontal and vertical flip with the probability 0.5. 
+- learning rate of 1e − 2 with a polynomial decay policy
+
+#### segmentation phase
+
+- training epochs 20 
+- learning rate 7e − 2
+- no restriction of the image resolution
+- data augmentation: horizontal and vertical flip, Gaussian blur and normalization
+
+### dataloader: [`dataset.py` (TrainSet, TestSet) ]
+
+1. train dataset: use original pathes without further sub crop
+2. train crop: add random resized crop (scale set to (0.25,1), defualt is (0.08, 1))
+3. train augmentation: random augmentation for pathology
+4. multi-scale test dataset: online crop for test, resize for multiple times firstly (eg, 0.5, 0.75, 1, 1.5, 2), then crop each reiszed image with stride (crop size same to train crop size)
+
+## test and eval: [`test.py`, `eval.py`]
+1. test with multi-scale test
+2. use x^y for the normal channel (1 - pos.max()) to contral the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt
+
+## improvements: (`train.py`)
+1. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
+2. data synthesis: cut mix in one batch after augmentation (010 mix 100 -> 110, 110 mix 101 -> 111)
+3. activation drop out: randomly drop high acti

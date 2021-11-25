@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 import png
 from PIL import Image
-from metric import get_mIOU
+from utils.metric import get_mIOU
 
 def visualize_result(model_names):
     """
@@ -28,7 +28,7 @@ def visualize_result(model_names):
             
             mask = np.asarray(Image.open(mask_path + f'/{i:02d}.png'))
             
-            cam_path = f'out_cam/{model_name}'
+            cam_path = f'valid_out_cam/{model_name}'
             cam = np.load(os.path.join(cam_path, f'{i:02d}.npy'), allow_pickle=True).astype(np.uint8)
             
             groundtruth = np.asarray(Image.open(gt_path + f'/{i:02d}.png'))
@@ -46,8 +46,8 @@ def visualize_result(model_names):
                 w.write(f, cam)
 
             plt.figure(i)
-            im = plt.imread(f'{i:02d}.png')
-            im_mask = plt.imread(f'{i:02d}_1.png')
+            im = plt.imread(f'temp/{i:02d}.png')
+            im_mask = plt.imread(f'temp/{i:02d}_1.png')
             gt = plt.imread(gt_path + f'/{i:02d}.png')
             origin = plt.imread(img_path + f'/{i:02d}.png')
 
