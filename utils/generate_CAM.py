@@ -24,13 +24,13 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
         batch_size (int): batch to process the cam
         mode (string): three options, 'train', 'valid', 'test'
     """
-    # out_path = 'train_pseudomask'
+    out_path = 'train_pseudomask'
     
-    # if not os.path.exists(out_path):
-    #     os.mkdir(out_path)
-    # else:
-    #     shutil.rmtree(out_path)
-    #     os.mkdir(out_path)
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+    else:
+        shutil.rmtree(out_path)
+        os.mkdir(out_path)
     net.cuda()
     net.eval()
 
@@ -107,8 +107,8 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
                     os.mkdir(f'ensemble_candidates/{model_name}_cam')
                 
                 resultpath = im_path[0].split('/')[-1].split('.')[0]
-                np.save(f'ensemble_candidates/{model_name}_cam/{resultpath}.npy', norm_cam)
-                # np.save(f'{out_path}/{resultpath}.npy', result_label)  ### why we need to save this??????
+                # np.save(f'ensemble_candidates/{model_name}_cam/{resultpath}.npy', norm_cam)
+                np.save(f'{out_path}/{resultpath}.npy', result_label)
 
             if mode == 'valid':         
                 with open('groundtruth.json') as f:
