@@ -96,10 +96,14 @@ class ScaleNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-        # self.normalize = Normalize()
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(2048, 128)
-        self.fc2 = nn.Linear(128, 3)
+        self.fc1 = nn.Linear(3584, 3)
+        # self.fc2 = nn.Linear(128, 3)
+        # self.f3_2 = torch.nn.Conv2d(512, 64, 1, bias=False)
+        # self.f3_3 = torch.nn.Conv2d(1024, 64, 1, bias=False)
+        # self.f3_4 = torch.nn.Conv2d(2048, 64, 1, bias=False)
+        # self.f4 = torch.nn.Conv2d(192, 192, 1, bias=False)
+
         self.not_training = []
         block.layer_idx = 0
 
@@ -121,18 +125,22 @@ class ScaleNet(nn.Module):
 
         x = F.max_pool2d(x, 3, 2, 1)
         x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x2 = self.layer2(x)
+        x3 = self.layer3(x2)
+        x4 = self.layer4(x3)
+        # x3_2 = F.elu(self.f3_2(x2))
+        # x3_3 = F.elu(self.f3_2(x3))
+        # x3_4 = F.elu(self.f3_2(x4))
+        # x5 = F.elu(self.f4(torch.cat([x3_2, x3_3, x3_4], dim=1)))
+        x5 = torch.cat([x2, x3, x4], dim=1)
 
-        result = self.pool(x)
+        result = self.pool(x5)
         result = torch.flatten(result, start_dim=1)
         result = self.fc1(result)
-        result =F.relu(result)
-        result = self.fc2(result)
+        # result =F.relu(result)
+        # result = self.fc2(result)
 
         return result
-        # return dict({'x2': x2, 'x3': x3, 'x4': x4})
 
     def train(self, mode=True):
 
