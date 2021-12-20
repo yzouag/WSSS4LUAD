@@ -145,7 +145,7 @@ if __name__ == '__main__':
         # 224 is the average size of the training images
         generate_cam(net_cam, setting_str, tuple((224, 224//3)), batch_size, 'valid', resize)
         valid_image_path = f'valid_out_cam/{setting_str}'
-        valid_iou = get_overall_valid_score(valid_image_path)
+        valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         iou_v.append(valid_iou)
         
         if valid_iou > best_val:

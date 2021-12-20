@@ -1,7 +1,9 @@
 import os
 from PIL import Image
 import numpy as np
-from tqdm import trange, tqdm
+from tqdm import tqdm
+from multiprocessing import Array, Process, Value
+from utils.crop_subpatches import chunks
 
 def calculate_IOU(pred, real):
     """
@@ -44,7 +46,7 @@ def get_mIOU(mask, groundtruth, prediction):
     score = calculate_IOU(after_mask_pred, after_mask_true)
     return score
 
-def get_overall_valid_score(pred_image_path):
+def get_overall_valid_score(pred_image_path, num_workers=5):
     """
     get the scores with validation groundtruth, the background will be masked out
     and return the score for all photos
@@ -57,27 +59,46 @@ def get_overall_valid_score(pred_image_path):
     Returns:
         float: the mIOU score
     """
-    groundtruth_path = 'Dataset/2.validation/mask'
-    mask_path = 'Dataset/2.validation/background-mask'
-    iou_score = 0
 
-    gt_list = []
-    pred_list = []
+    l = np.random.permutation(40)
+    image_list = chunks(l, num_workers)
 
-    for i in range(40):
-        mask = np.asarray(Image.open(mask_path + f'/{i:02d}.png')).reshape(-1)
-        cam = np.load(os.path.join(pred_image_path, f'{i:02d}.npy'), allow_pickle=True).astype(np.uint8).reshape(-1)
-        groundtruth = np.asarray(Image.open(groundtruth_path + f'/{i:02d}.png')).reshape(-1)
-        pred = cam[mask==0]
-        gt = groundtruth[mask==0]
-        gt_list.extend(gt)
-        pred_list.extend(pred)
-    pred = np.array(pred_list)
-    real = np.array(gt_list)
-    for i in tqdm([0, 1, 2]):
-        if i in pred:
-            intersection = sum(np.logical_and(pred == i, real == i))
-            union = sum(np.logical_or(pred == i, real == i))
-            iou_score += intersection/union
-    return iou_score/3
-    
+    def f(intersection, union, image_list):
+        groundtruth_path = 'Dataset/2.validation/mask'
+        mask_path = 'Dataset/2.validation/background-mask'
+        gt_list = []
+        pred_list = []
+        
+        for i in image_list:
+            mask = np.asarray(Image.open(mask_path + f'/{i:02d}.png')).reshape(-1)
+            cam = np.load(os.path.join(pred_image_path, f'{i:02d}.npy'), allow_pickle=True).astype(np.uint8).reshape(-1)
+            groundtruth = np.asarray(Image.open(groundtruth_path + f'/{i:02d}.png')).reshape(-1)
+            pred = cam[mask==0]
+            gt = groundtruth[mask==0]
+            gt_list.extend(gt)
+            pred_list.extend(pred)
+        
+        pred = np.array(pred_list)
+        real = np.array(gt_list)
+        for i in [0, 1, 2]:
+            if i in pred:
+                inter = sum(np.logical_and(pred == i, real == i))
+                u = sum(np.logical_or(pred == i, real == i))
+                intersection[i] += inter
+                union[i] += u
+
+    intersection = Array('d', [0,0,0])
+    union = Array('d', [0,0,0])
+
+    p_list = []
+    for i in range(num_workers):
+        p = Process(target=f, args=(intersection, union, image_list[i]))
+        p.start()
+        p_list.append(p)
+    for p in p_list:
+        p.join()
+    class0 = intersection[0]/union[0]
+    class1 = intersection[1]/union[1]
+    class2 = intersection[2]/union[2]
+    return (class0+class1+class2)/3
+
