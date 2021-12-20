@@ -46,6 +46,7 @@ if __name__ == '__main__':
     parser.add_argument("-save_every", default=10, type=int, help="how often to save a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name', required=True)
+    parser.add_argument('-resnet', type=bool, action='store_true', default=False)
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -55,11 +56,15 @@ if __name__ == '__main__':
     save_every = args.save_every
     devices = args.device
     setting_str = args.m
+    useresnet = args.resnet
 
-    net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
+    if useresnet:
+        net = network.wide_resnet()
+    else:
+        net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     train_transform = transforms.Compose([
-        transforms.Resize((resize, resize)),
+        transforms.RandomResizedCrop(size=resize, scale=(0.25,1)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
@@ -118,11 +123,14 @@ if __name__ == '__main__':
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
 
-        net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
+        if useresnet:
+            net_cam = network.wide_resnet_cam()
+        else:
+            net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
         pretrained = net.state_dict()
         pretrained = {k[7:]: v for k, v in pretrained.items()}
         pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-        pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+        # pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
         net_cam.load_state_dict(pretrained)
         generate_cam(net_cam, setting_str, tuple((side_length, side_length//3)), batch_size, 'valid', resize)
         valid_image_path = f'valid_out_cam/{setting_str}'

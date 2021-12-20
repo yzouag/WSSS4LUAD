@@ -116,9 +116,9 @@ class Normalize():
 
         return proc_img
 
-class Net(nn.Module):
+class wideResNet_cam(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(wideResNet_cam, self).__init__()
 
         self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 
