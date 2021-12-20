@@ -129,7 +129,6 @@ class ScaleNetCAM(nn.Module):
         result = self.fc2(result)
 
         return result
-        # return dict({'x2': x2, 'x3': x3, 'x4': x4})
 
     def train(self, mode=True):
 
