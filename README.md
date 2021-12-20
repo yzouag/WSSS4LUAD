@@ -5,7 +5,9 @@
 
 https://arxiv.org/pdf/2110.08048.pdf
 
+## data
 
+for the training set, the average size of images is (224, 224).
 
 ## project structure
 

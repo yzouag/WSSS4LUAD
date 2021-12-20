@@ -1,3 +1,6 @@
+# this file uses images without crop to train the model
+# purpose: is crop really useful?
+
 import argparse
 from PIL import Image
 import numpy as np
@@ -56,8 +59,16 @@ if __name__ == '__main__':
     devices = args.device
     setting_str = args.m
 
+    if not os.path.exists('modelstates'):
+        os.mkdir('modelstates')
+    if not os.path.exists('valid_out_cam'):
+        os.mkdir('valid_out_cam')
+
+    # load the model
     net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
+    
+    # data augmentation
     train_transform = transforms.Compose([
         transforms.Resize((resize, resize)),
         transforms.RandomHorizontalFlip(),
@@ -66,28 +77,23 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
+    # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
 
+    # optimizer and loss
     optimizer = PolyOptimizer(net.parameters(), base_lr, weight_decay=1e-4, max_step=epochs, momentum=0.9)
     criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
     criteria.cuda()
 
-    valid_image_path = 'valid_patches'
-    valid_image_path = os.path.join(valid_image_path, os.listdir(valid_image_path)[0])
-    side_length = np.asarray(Image.open(valid_image_path)).shape[0]
-    print('side length: ', side_length)
-
-    if not os.path.exists('modelstates'):
-        os.mkdir('modelstates')
-
+    # train loop
     loss_t = []
     accuracy_t = []
     iou_v = []
     best_val = 0
-
+    
     for i in range(epochs):
         count = 0
         running_loss = 0.
@@ -108,23 +114,27 @@ if __name__ == '__main__':
             for k in range(len(predict)):
                 if torch.equal(predict[k], label[k]):
                     correct += 1
-
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
+        
         train_loss = running_loss / count
         train_acc = correct / (count * batch_size)
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
 
+        # load the parameters into cam network
         net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
         pretrained = net.state_dict()
         pretrained = {k[7:]: v for k, v in pretrained.items()}
         pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
         pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
         net_cam.load_state_dict(pretrained)
-        generate_cam(net_cam, setting_str, tuple((side_length, side_length//3)), batch_size, 'valid', resize)
+        
+        # calculate MIoU
+        # 224 is the average size of the training images
+        generate_cam(net_cam, setting_str, tuple((224, 224//3)), batch_size, 'valid', resize)
         valid_image_path = f'valid_out_cam/{setting_str}'
         valid_iou = get_overall_valid_score(valid_image_path)
         iou_v.append(valid_iou)
