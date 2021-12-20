@@ -1,122 +1,60 @@
 # WSSS4LUAD
 
-## Introduction
 
-This is a project from the [Grand Challenge Website](https://wsss4luad.grand-challenge.org/WSSS4LUAD/). Currently we achieved a mIOU score of `0.7411`, ranked 10 on the test phase [leader board](https://wsss4luad.grand-challenge.org/evaluation/test-phase/leaderboard/) of the challenge submitted with the account shichuanyexi@gmail.com. Due to intense coursework during the semester, we expect to give further improvements after the Fall 2021-2022 term (from mid-December to late-January) to a mIOU score above 0.80, this is possible since currently we still have many ideas not implemented.
+## baseline
 
-## Dataset
-
-The dataset is obtained from the [challenge website](https://wsss4luad.grand-challenge.org/Datasets/) but it is currently locked due to the close of the competition. 
-
-Please drop an email to yyubm@connect.ust.hk or yzouag@connect.ust.hk and we will review whether we can send the dataset to you based on the request reason.
-
-The folder structure is listed below(under the main folder WSSS4LUAD):
-
-```
-├── Dataset
-│   ├── 1.training
-│   ├── 2.validation
-│   │   ├── background-mask
-│   │   ├── img
-│   │   └── mask
-│   └── 3.testing
-│       ├── background-mask
-│       └── img
-```
+https://arxiv.org/pdf/2110.08048.pdf
 
 
 
-**Once again, this project is not finished yet and we are still in progress!**
-
-## crop images
-
-If you only want to get the single label images, use the command below
+## project structure
 
 ```bash
-python crop_single.py --side_length 128 --stride 32 --white_threshold 0.9 --cell_percent 0.1
-```
-
-`--side_length` and `--stride` is the configuration of the crop patch size and stride. 
-
-`--white_threshold` is the propotion of white pixels that will let us view this subpatch as invalid and abandon this cropped subpatch
-
-`--cell_percent` is the threshold for asserting one image contain certain label for the validation set.
-
-The validation result is in `./valid_patches`, the training single label patches are in `./train_single_label_patches`
-
-For the training process of only single label patches
-
-```bash
-python train_single_patches.py -d 0 1 2 3 -m default
-```
-
-`-d` is used to add GPU numbers and `-m` is to specify the save model name, you can also tweak the batch_size, gamma, lr, etc.
-
-make sure you downloaded the [Scalenet101 weights](https://pan.baidu.com/share/init?surl=NOjFWzkAVmMNkZh6jIcMzA) with extract code: f1c5 and put it in `weights/scalenet101.pth`
-
-**IMPORTANT NOTES!**
-When you are writing code, pay attention to the followings:
-
-- Currently we will only use one phase training rather than two phase, the old training file are dumped to legacy for reference only and the new training file is called `train_integrated.py`
-- All of the models currently using are scalenet101, it is located in the `network` folder
-- Avoid hard code! Always use the argparser to modulate the hyperparameters! Be careful! There are loads of them!
-- Please put other useful functions in `utils.util.py`
-- Some data folder names are *strictly reserved* for specific purpose! like `train_single_patches`, do not use it for other purposes!
-
-## Reserved folder names
-
-- `sample_single_label_patches` it is where the doubledataset fetch the single_label images
-- `sample_multiple_label_patches` it is where the doubledataset fetch the double_label images
-- `train_single_label_patches` it is the originally cutted single_label images, it might be the same with sample_single_patches if we use only one-phase training
-- `train_multiple_label_patches` it is the originally cutted double_label images, we need to filter out the useful labels to `sample_double_patches`
-- `valid_patches` it is where small crops of validation images
-
-## Main file explained
-- `train_integrated.py` This is our main training file, which accept the doublelabeldataset and use pretrained scalenet101 to trin
-- `*original_patches.py` All of these files are related to origin image label training and testing, in another word, the big patch model
-
-```
-│  .gitignore
-│  dataset.py	# contains all the useful dataset
-│  main.py
-│  README.md
-│  requirements.txt
-│  run.sh
-│  testing.ipynb
-├─image		# accuracy and loss curves of trained models
-├─legacy	# All the deprecated code
-├─network
-├─result
-├─structures
+├─network # backbone models
+│  └─structures # scalenet structures
+├─result # images and logs for experiment results
 ├─train
-└─utils		# All the general purpose functions
+└─utils	
 ```
 
-## Main Procedures
+## model design
 
-step 1: crop valid images to small patches
+### backbone [`network/wide_resnet_cam.py`, `network/scalenet_cam.py`]
+1.  add wide resnet-38 for fair comparision (verify the next modifications based on it, and apply scalenet after all settings are ready)
 
-step 2: use big label network predict the crops, get the best threshold
+2.  multi-scale feature map fusion (concat layer2, layer3, layer4 before fc)
 
-step 3: crop train images
+### training settings: [`train.py`]
 
-​    step 3.1: crop single label images
+**require modification!**
 
-​    step 3.2: crop mixed label images
+#### classification
 
-step 4: use big label network predict the mixed-label image small crops under the threshold
+- resolution of the patches is 224 × 224
+- batch size is set to 20
+- training epochs is set to 20
+- data augmentation: random horizontal and vertical flip with the probability 0.5. 
+- learning rate of 1e − 2 with a polynomial decay policy
 
-step 4.5 balancing the train data
+#### segmentation phase
 
-step 5: train small_crop network
+- training epochs 20 
+- learning rate 7e − 2
+- no restriction of the image resolution
+- data augmentation: horizontal and vertical flip, Gaussian blur and normalization
 
-step 6: generate CAM
+### dataloader: [`dataset.py` (TrainSet, TestSet) ]
 
-step 6.5: generate visualization result and validation
+1. train dataset: use original pathes without further sub crop
+2. train crop: add random resized crop (scale set to (0.25,1), defualt is (0.08, 1))
+3. train augmentation: random augmentation for pathology
+4. multi-scale test dataset: online crop for test, resize for multiple times firstly (eg, 0.5, 0.75, 1, 1.5, 2), then crop each reiszed image with stride (crop size same to train crop size)
 
-step 7: train segmentation network
+## test and eval: [`test.py`, `eval.py`]
+1. test with multi-scale test
+2. use x^y for the normal channel (1 - pos.max()) to contral the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt
 
-step 8: make segmentation prediction
-
-step 9: post processing
-
+## improvements: (`train.py`)
+1. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
+2. data synthesis: cut mix in one batch after augmentation (010 mix 100 -> 110, 110 mix 101 -> 111)
+3. activation drop out: randomly drop high acti
