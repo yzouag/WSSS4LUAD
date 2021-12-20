@@ -1,6 +1,7 @@
 import os
 from PIL import Image
 import numpy as np
+from tqdm import trange, tqdm
 
 def calculate_IOU(pred, real):
     """
@@ -73,7 +74,7 @@ def get_overall_valid_score(pred_image_path):
         pred_list.extend(pred)
     pred = np.array(pred_list)
     real = np.array(gt_list)
-    for i in [0, 1, 2]:
+    for i in tqdm([0, 1, 2]):
         if i in pred:
             intersection = sum(np.logical_and(pred == i, real == i))
             union = sum(np.logical_or(pred == i, real == i))

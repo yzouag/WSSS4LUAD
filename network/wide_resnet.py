@@ -152,14 +152,11 @@ class wideResNet(nn.Module):
         self.normalize = Normalize()
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.fc1 = nn.Linear(7168, 3)
+        self.fc1 = nn.Linear(5632, 3)
 
         return
 
     def forward(self, x):
-    #     return self.forward_as_dict(x)['conv6']
-
-    # def forward_as_dict(self, x):
 
         x = self.conv1a(x)
 

@@ -151,7 +151,7 @@ class wideResNet_cam(nn.Module):
 
         self.normalize = Normalize()
 
-        self.fc1 = torch.nn.Conv2d(7168, 3, 1, stride=1, padding=0, bias=True)
+        self.fc1 = torch.nn.Conv2d(5632, 3, 1, stride=1, padding=0, bias=True)
 
         return
 

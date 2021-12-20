@@ -97,8 +97,8 @@ class ScaleNetCAM(nn.Module):
                 m.bias.data.zero_()
 
         # self.normalize = Normalize()
-        self.fc1 = torch.nn.Conv2d(2048, 128, 1, stride=1, padding=0, bias=True)
-        self.fc2 = torch.nn.Conv2d(128, 3, 1, stride=1, padding=0, bias=True)
+        self.fc1 = torch.nn.Conv2d(3584, 3, 1, stride=1, padding=0, bias=True)
+        # self.fc2 = torch.nn.Conv2d(128, 3, 1, stride=1, padding=0, bias=True)
         self.not_training = []
         block.layer_idx = 0
 
@@ -124,9 +124,10 @@ class ScaleNetCAM(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
 
-        result = self.fc1(x4)
-        result = F.relu(result)
-        result = self.fc2(result)
+        x5 = torch.cat([x2, x3, x4], dim=1)
+        result = self.fc1(x5)
+        # result = F.relu(result)
+        # result = self.fc2(result)
 
         return result
 

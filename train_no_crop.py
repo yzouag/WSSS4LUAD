@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument("-save_every", default=10, type=int, help="how often to save a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name', required=True)
-    parser.add_argument('-resnet', type=bool, action='store_true', default=False)
+    parser.add_argument('-resnet', action='store_true', default=False)
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -66,9 +66,11 @@ if __name__ == '__main__':
         os.mkdir('valid_out_cam')
 
     if useresnet:
-        net = network.wide_resnet()
+        resnet38_path = "weights/res38d.pth"
+        net = network.wideResNet()
+        net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
-        net = network.scalenet101(structure_path='structures/scalenet101.json', ckpt='weights/scalenet101.pth')
+        net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
 
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
@@ -129,9 +131,9 @@ if __name__ == '__main__':
         loss_t.append(train_acc)
 
         if useresnet:
-            net_cam = network.wide_resnet_cam()
+            net_cam = network.wideResNet_cam()
         else:
-            net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
+            net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
 
         pretrained = net.state_dict()
         pretrained = {k[7:]: v for k, v in pretrained.items()}
