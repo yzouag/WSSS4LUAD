@@ -12,30 +12,38 @@ from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
 
-# def train_small_label(net, train_loader, valid_side_length, optimizer, criteria, scheduler, epochs, save_every, setting_str, batch_size):
-#     """
-#     the training and validation function for small crop images
+class PolyOptimizer(torch.optim.SGD):
 
-#     Args:
-#         net (network): the model for training
-#         train_loader (dataloader): train data loader
-#         valid_side_length (int): the side length of the valid image crop
-#         optimizer (optim): the optimizer for the training
-#         criteria (loss): the loss function for training
-#         scheduler (scheduler): training scheduler
-#         epochs (int): number of training epochs
-#         save_every (int): number of epochs to save one model
-#         setting_str (str): the model name
-#     """
+    def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
+        super().__init__(params, lr, weight_decay)
+
+        self.global_step = 0
+        self.max_step = max_step
+        self.momentum = momentum
+
+        self.__initial_lr = [group['lr'] for group in self.param_groups]
+
+
+    def step(self, closure=None):
+
+        if self.global_step < self.max_step:
+            lr_mult = (1 - self.global_step / self.max_step) ** self.momentum
+
+            for i in range(len(self.param_groups)):
+                self.param_groups[i]['lr'] = self.__initial_lr[i] * lr_mult
+
+        super().step(closure)
+
+        self.global_step += 1
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-batch", default=24, type=int)
-    parser.add_argument("-epoch", default=15, type=int)
-    parser.add_argument("-lr", default=0.001, type=float)
-    parser.add_argument("-resize", default=448, type=int)
-    parser.add_argument("-step", default=5, type=int, help='the step size for the scheduler')
+    parser.add_argument("-batch", default=20, type=int)
+    parser.add_argument("-epoch", default=20, type=int)
+    parser.add_argument("-lr", default=0.01, type=float)
+    parser.add_argument("-resize", default=224, type=int)
     parser.add_argument("-save_every", default=10, type=int, help="how often to save a model while training")
-    parser.add_argument("-gamma", default=0.1, type=float)
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name', required=True)
     args = parser.parse_args()
@@ -44,9 +52,7 @@ if __name__ == '__main__':
     epochs = args.epoch
     base_lr = args.lr
     resize = args.resize
-    step_size = args.step
     save_every = args.save_every
-    gamma = args.gamma
     devices = args.device
     setting_str = args.m
 
@@ -59,23 +65,13 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    # val_transform = transforms.Compose([
-    #     transforms.Resize((resize, resize)),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # ])
 
-    TrainDataset = dataset.DoubleLabelDataset(transform=train_transform)
+    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
-    
-    # ValidDataset = dataset.ValidationDataset("valid_patches", transform=val_transform)
-    # print("valid Dataset", len(ValidDataset))
-    # ValidDataloader = DataLoader(ValidDataset, batch_size=batch_size, num_workers=2, drop_last=True)
 
-    optimizer = torch.optim.SGD(net.parameters(), base_lr, momentum=0.9, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
+    optimizer = PolyOptimizer(net.parameters(), base_lr, weight_decay=1e-4, max_step=epochs, momentum=0.9)
     criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
     criteria.cuda()
 
@@ -119,35 +115,9 @@ if __name__ == '__main__':
             running_loss += loss.item()
         train_loss = running_loss / count
         train_acc = correct / (count * batch_size)
-        scheduler.step()
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
 
-        # # if i % 3 == 0:
-        # with torch.no_grad():
-        #     net.eval()
-        #     running_loss = 0.0
-        #     running_corrects = 0
-        #     count = 0
-        #     for img, label in tqdm(valid_loader):
-        #         count += 1
-        #         img = img.cuda()
-        #         label = label.cuda()
-        #         scores = net(img)
-        #         loss = criteria(scores, label.float())
-                
-        #         scores = torch.sigmoid(scores)
-        #         predict = torch.zeros_like(scores)
-        #         predict[scores > 0.5] = 1
-        #         predict[scores <= 0.5] = 0
-        #         for k in range(len(predict)):
-        #             if torch.equal(predict[k], label[k]):
-        #                 running_corrects += 1
-        #         running_loss += loss.item()
-        #     valid_loss = running_loss / count
-        #     valid_acc = running_corrects / (count * batch_size)
-        #     loss_v.append(valid_loss)
-        #     accuracy_v.append(valid_acc)
         net_cam = network.scalenet101_cam(structure_path='structures/scalenet101.json')
         pretrained = net.state_dict()
         pretrained = {k[7:]: v for k, v in pretrained.items()}
