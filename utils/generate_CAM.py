@@ -23,9 +23,10 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
         model_crop (tuple): (side_length, stride)
         batch_size (int): batch to process the cam
         mode (string): three options, 'train', 'valid', 'test'
+        resize (int): the size image is changed to
     """
-    out_path = 'train_pseudomask'
-    
+
+    out_path = 'train_pseudomask'    
     if not os.path.exists(out_path):
         os.mkdir(out_path)
     else:

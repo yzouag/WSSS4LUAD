@@ -7,6 +7,7 @@ import os
 from collections import Counter
 from os.path import join as osp
 from tqdm import tqdm
+from cv2 import imread
 
 
 def convertinttoonehot(nums_list: torch.tensor):
@@ -141,3 +142,15 @@ def online_cut_patches(im, im_size=96, stride=32):
             im_list.append(temp)
             position_list.append((i,j))
     return im_list, position_list
+
+
+def get_average_image_size(path):
+    images = os.listdir(path)
+    height = 0
+    width = 0
+    for image in images:
+        h, w, _ = imread(path + '/' + image).shape
+        height += h
+        width += w
+
+    print(height/len(images), width/len(images))
