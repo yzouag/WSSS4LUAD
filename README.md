@@ -9,7 +9,13 @@ https://arxiv.org/pdf/2110.08048.pdf
 
 ## project structure
 
-
+```bash
+├─network # backbone models
+│  └─structures # scalenet structures
+├─result # images and logs for experiment results
+├─train
+└─utils	
+```
 
 ## model design
 
