@@ -58,40 +58,52 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
     onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
 
     with torch.no_grad():
-        for im_path, im_list, position_list in tqdm(onlineDataloader):
+        for im_path, scaled_im_list, scaled_position_list, scales in tqdm(onlineDataloader):
             orig_img = np.asarray(Image.open(im_path[0]))
-            interpolatex = side_length
-            interpolatey = side_length
-            if orig_img.shape[0] < side_length:
-                interpolatex = orig_img.shape[0]
-            if orig_img.shape[1] < side_length:
-                interpolatey = orig_img.shape[1]
+            w, h, _ = orig_img.shape
+            ensemble_cam = np.zeros((3, w, h))
 
-            im_list = torch.vstack(im_list)
+            for s in range(len(scales[0])):
+                w_ = int(w*scales[s])
+                h_ = int(h*scales[s])
+                interpolatex = side_length
+                interpolatey = side_length
 
-            im_list = torch.split(im_list, batch_size)
-            cam_list = []
-            for ims in im_list:
-                cam_scores = net(ims.cuda())
-                cam_scores = F.interpolate(cam_scores, (interpolatex, interpolatey), mode='bilinear', align_corners=False).detach().cpu().numpy()
-                cam_list.append(cam_scores)
-            cam_list = np.concatenate(cam_list)
+                if w_ < side_length:
+                    interpolatex = w_
+                if h_ < side_length:
+                    interpolatey = h_
+                # print(len(scaled_im_list), len(scaled_position_list), scales)
+                im_list = scaled_im_list[s]
+                position_list = scaled_position_list[s]
 
-            sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
-            sum_counter = np.zeros_like(sum_cam)
+                im_list = torch.vstack(im_list)
+
+                im_list = torch.split(im_list, batch_size)
+                cam_list = []
+                for ims in im_list:
+                    cam_scores = net(ims.cuda())
+                    cam_scores = F.interpolate(cam_scores, (interpolatex, interpolatey), mode='bilinear', align_corners=False).detach().cpu().numpy()
+                    cam_list.append(cam_scores)
+                cam_list = np.concatenate(cam_list)
+
+                sum_cam = np.zeros((3, w_, h_))
+                sum_counter = np.zeros_like(sum_cam)
             
-            for k in range(cam_list.shape[0]):
-                y, x = position_list[k][0], position_list[k][1]
-                crop = cam_list[k]
-                sum_cam[:, y:y+side_length, x:x+side_length] += crop
-                sum_counter[:, y:y+side_length, x:x+side_length] += 1
-            sum_counter[sum_counter < 1] = 1
+                for k in range(cam_list.shape[0]):
+                    y, x = position_list[k][0], position_list[k][1]
+                    crop = cam_list[k]
+                    sum_cam[:, y:y+side_length, x:x+side_length] += crop
+                    sum_counter[:, y:y+side_length, x:x+side_length] += 1
+                sum_counter[sum_counter < 1] = 1
 
-            norm_cam = sum_cam / sum_counter
-            # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
-            # cam_min = np.min(sum_cam, (1, 2), keepdims=True)
-            # sum_cam[sum_cam < cam_min+1e-5] = 0
-            # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
+                norm_cam = sum_cam / sum_counter
+                print(torch.tensor([norm_cam]).shape)
+                ensemble_cam += F.interpolate(torch.tensor([norm_cam]), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
+                # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
+                # cam_min = np.min(sum_cam, (1, 2), keepdims=True)
+                # sum_cam[sum_cam < cam_min+1e-5] = 0
+                # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
 
             if mode == 'train':
                 big_label = np.array([int(im_path[0][-12]), int(im_path[0][-9]), int(im_path[0][-6])])
@@ -118,8 +130,8 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
                 
                 for k in range(3):
                     if big_label[k] == 0:
-                        norm_cam[k, :, :] = -inf
-                result_label = norm_cam.argmax(axis=0)
+                        ensemble_cam[k, :, :] = -inf
+                result_label = ensemble_cam.argmax(axis=0)
 
                 if not os.path.exists('valid_out_cam'):
                     os.mkdir('valid_out_cam')

@@ -144,6 +144,19 @@ def online_cut_patches(im, im_size=96, stride=32):
     return im_list, position_list
 
 
+def multiscale_online_crop(im, im_size, stride, scales):
+    im = Image.fromarray(im)
+    w, h = im.size
+    scale_im_list = []
+    scale_position_list = []
+    for scale in scales:
+        scaled_im = np.asarray(im.resize((int(w*scale), int(h*scale))))
+        im_list, position_list = online_cut_patches(scaled_im, im_size, stride)
+        scale_im_list.append(im_list)
+        scale_position_list.append(position_list)
+
+    return scale_im_list, scale_position_list
+
 def get_average_image_size(path):
     images = os.listdir(path)
     height = 0
