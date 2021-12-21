@@ -1,6 +1,6 @@
 # this file uses images without crop to train the model
 # purpose: is crop really useful?
-
+import time
 import argparse
 from PIL import Image
 import numpy as np
@@ -65,11 +65,14 @@ if __name__ == '__main__':
     if not os.path.exists('valid_out_cam'):
         os.mkdir('valid_out_cam')
 
+    prefix = ""
     if useresnet:
+        prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
         net = network.wideResNet()
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
+        prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
 
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
@@ -143,22 +146,24 @@ if __name__ == '__main__':
         
         # calculate MIoU
         # 224 is the average size of the training images
-        generate_cam(net_cam, setting_str, tuple((224, 224//3)), batch_size, 'valid', resize)
-        valid_image_path = f'valid_out_cam/{setting_str}'
+        generate_cam(net_cam, prefix + setting_str, tuple((224, 224//3)), batch_size, 'valid', resize)
+        start_time = time.time()
+        valid_image_path = f'valid_out_cam/{prefix + setting_str}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         iou_v.append(valid_iou)
+        print("--- %s seconds ---" % (time.time() - start_time))
         
         if valid_iou > best_val:
             print("Updating the best model..........................................")
             best_val = valid_iou
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_best.pth")
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_best.pth")
     
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
 
         if (i + 1) % save_every == 0 and (i + 1) != epochs:
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_ep"+str(i+1)+".pth")
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_ep"+str(i+1)+".pth")
 
-    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + setting_str + "_last.pth")
+    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_last.pth")
 
     plt.figure(1)
     plt.plot(loss_t)

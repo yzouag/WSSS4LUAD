@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from multiprocessing import Array, Process, Value
 from utils.crop_subpatches import chunks
+import time
 
 def calculate_IOU(pred, real):
     """
@@ -100,5 +101,5 @@ def get_overall_valid_score(pred_image_path, num_workers=5):
     class0 = intersection[0]/union[0]
     class1 = intersection[1]/union[1]
     class2 = intersection[2]/union[2]
-    return (class0+class1+class2)/3
+    return (class0 + class1 + class2)/3
 
