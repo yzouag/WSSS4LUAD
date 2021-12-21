@@ -13,7 +13,7 @@ import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
-from utils.util import report
+from utils.util import get_average_image_size, report
 
 
 class PolyOptimizer(torch.optim.SGD):
@@ -67,7 +67,9 @@ if __name__ == '__main__':
         os.mkdir('modelstates')
     if not os.path.exists('valid_out_cam'):
         os.mkdir('valid_out_cam')
+    average_image_size = get_average_image_size('Dataset/1.training')
 
+    # load model
     prefix = ""
     if useresnet:
         prefix = "resnet"
@@ -150,9 +152,8 @@ if __name__ == '__main__':
         # pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
         net_cam.load_state_dict(pretrained)
         
-        # calculate MIoU
-        # 224 is the average size of the training images
-        generate_cam(net_cam, prefix + model_name, tuple((224, 224//3)), batch_size, 'valid', resize)
+        # calculate MIOU
+        generate_cam(net_cam, prefix + model_name, (average_image_size, average_image_size//3), batch_size, 'valid', resize)
         start_time = time.time()
         valid_image_path = f'valid_out_cam/{prefix + model_name}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)

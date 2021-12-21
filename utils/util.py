@@ -143,7 +143,33 @@ def online_cut_patches(im, im_size=96, stride=32):
     return im_list, position_list
 
 
+def multiscale_online_crop(im, im_size, stride, scales):
+    """
+    first resize the image to different scales, then crop according to `im_size`
+
+    Returns:
+        scale_im_list: the image list
+        scale_position_list: the images position
+    """
+    im = Image.fromarray(im)
+    w, h = im.size
+    scale_im_list = []
+    scale_position_list = []
+    for scale in scales:
+        scaled_im = np.asarray(im.resize((int(w*scale), int(h*scale))))
+        im_list, position_list = online_cut_patches(scaled_im, im_size, stride)
+        scale_im_list.append(im_list)
+        scale_position_list.append(position_list)
+
+    return scale_im_list, scale_position_list
+
 def get_average_image_size(path):
+    """
+    get the average size of the images in the path directory
+
+    Args:
+        path (str): image path
+    """
     images = os.listdir(path)
     height = 0
     width = 0
@@ -181,6 +207,9 @@ def chunks(lst, num_workers=None, n=None):
         return chunk_list
 
 def report(batch_size, epochs, lr, resize, model_name, back_bone, remark):
+    """
+    create the reporter dict, record important information in the experiment
+    """
     specs = {}
     specs['model_name'] = model_name
     specs['batch_size'] = batch_size

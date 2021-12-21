@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 import torch
-from utils.util import online_cut_patches
+from utils.util import online_cut_patches, multiscale_online_crop
 class OriginPatchesDataset(Dataset):
     def __init__(self, data_path_name = "Dataset/1.training", transform=None):
         self.path = data_path_name
@@ -11,7 +11,7 @@ class OriginPatchesDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return len(self.files)
+        return len(self.files[:50])
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
@@ -23,12 +23,13 @@ class OriginPatchesDataset(Dataset):
         return im, label
 
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None, patch_size = 56, stride=28):
+    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[0.5, 0.75, 1, 1.5, 2]):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
         self.patch_size = patch_size
         self.stride = stride
+        self.scales = scales
 
     def __len__(self):
         return len(self.files)
@@ -36,13 +37,13 @@ class OnlineDataset(Dataset):
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
         im = np.asarray(Image.open(image_path))
-        im_list, position_list = online_cut_patches(im, self.patch_size, self.stride)
+        scaled_im_list, scaled_position_list = multiscale_online_crop(im, self.patch_size, self.stride, self.scales)
         if self.transform:
-            for patch_id in range(len(im_list)):
-                im_list[patch_id] = self.transform(im_list[patch_id])
-        # label = int(self.files[idx][-5:-4])
-        # position = tuple(int(self.files[idx][-7]), int(self.files[idx][-8]))
-        return image_path, im_list, position_list
+            for im_list in scaled_im_list:
+                for patch_id in range(len(im_list)):
+                    im_list[patch_id] = self.transform(im_list[patch_id])
+
+        return image_path, scaled_im_list, scaled_position_list, self.scales
 
 # class OnlineTrainDataset(Dataset):
 #     def __init__(self, data_path_name, transform=None):
