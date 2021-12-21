@@ -1,9 +1,8 @@
 # this file uses images without crop to train the model
 # purpose: is crop really useful?
+import json
 import time
 import argparse
-from PIL import Image
-import numpy as np
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -14,9 +13,10 @@ import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
+from utils.util import report
+
 
 class PolyOptimizer(torch.optim.SGD):
-
     def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
         super().__init__(params, lr, weight_decay)
 
@@ -50,6 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name', required=True)
     parser.add_argument('-resnet', action='store_true', default=False)
+    parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -58,8 +59,10 @@ if __name__ == '__main__':
     resize = args.resize
     save_every = args.save_every
     devices = args.device
-    setting_str = args.m
+    model_name = args.m
     useresnet = args.resnet
+    remark = args.note
+
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
     if not os.path.exists('valid_out_cam'):
@@ -69,22 +72,25 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
         net = network.wideResNet()
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
+    scale = (0.25,1)
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=resize, scale=(0.25,1)),
+        transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
@@ -146,9 +152,9 @@ if __name__ == '__main__':
         
         # calculate MIoU
         # 224 is the average size of the training images
-        generate_cam(net_cam, prefix + setting_str, tuple((224, 224//3)), batch_size, 'valid', resize)
+        generate_cam(net_cam, prefix + model_name, tuple((224, 224//3)), batch_size, 'valid', resize)
         start_time = time.time()
-        valid_image_path = f'valid_out_cam/{prefix + setting_str}'
+        valid_image_path = f'valid_out_cam/{prefix + model_name}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         iou_v.append(valid_iou)
         print("--- %s seconds ---" % (time.time() - start_time))
@@ -156,14 +162,14 @@ if __name__ == '__main__':
         if valid_iou > best_val:
             print("Updating the best model..........................................")
             best_val = valid_iou
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_best.pth")
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_best.pth")
     
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
 
         if (i + 1) % save_every == 0 and (i + 1) != epochs:
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_ep"+str(i+1)+".pth")
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_ep"+str(i+1)+".pth")
 
-    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + setting_str + "_last.pth")
+    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_last.pth")
 
     plt.figure(1)
     plt.plot(loss_t)
@@ -186,3 +192,9 @@ if __name__ == '__main__':
     plt.xlabel('epochs')
     plt.title('valid accuracy')
     plt.savefig('./image/valid_iou.png')
+
+    reporter['training_accuracy'] = accuracy_t
+    reporter['best_validation_mIOU'] = best_val
+
+    with open('result/experiment.json', 'a') as fp:
+        json.dump(reporter, fp)

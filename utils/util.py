@@ -9,7 +9,6 @@ from os.path import join as osp
 from tqdm import tqdm
 from cv2 import imread
 
-
 def convertinttoonehot(nums_list: torch.tensor):
     dic = {0: [1, 0, 0], 1: [0, 1, 0], 2: [0, 0, 1]}
     result = np.empty((len(nums_list), 3))
@@ -154,3 +153,39 @@ def get_average_image_size(path):
         width += w
 
     print(height/len(images), width/len(images))
+
+def chunks(lst, num_workers=None, n=None):
+    """
+    a helper function for seperate the list to chunks
+
+    Args:
+        lst (list): the target list
+        num_workers (int, optional): Default is None. When num_workers are not None, the function divide the list into num_workers chunks
+        n (int, optional): Default is None. When the n is not None, the function divide the list into n length chunks
+
+    Returns:
+        llis: a list of small chunk lists
+    """
+    chunk_list = []
+    if num_workers is None and n is None:
+        print("the function should at least pass one positional argument")
+        exit()
+    elif n == None:
+        n = np.ceil(len(lst)/num_workers)
+        for i in range(0, len(lst), n):
+            chunk_list.append(lst[i:i + n])
+        return chunk_list
+    else:
+        for i in range(0, len(lst), n):
+            chunk_list.append(lst[i:i + n])
+        return chunk_list
+
+def report(batch_size, epochs, lr, resize, model_name, back_bone, remark):
+    specs = {}
+    specs['model_name'] = model_name
+    specs['batch_size'] = batch_size
+    specs['training_epochs'] = epochs
+    specs['learning_rate'] = lr
+    specs['training_image_size'] = resize
+    specs['back_bone'] = back_bone
+    specs['remark'] = remark

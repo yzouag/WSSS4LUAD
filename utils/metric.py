@@ -1,10 +1,8 @@
 import os
 from PIL import Image
 import numpy as np
-from tqdm import tqdm
-from multiprocessing import Array, Process, Value
-from utils.crop_subpatches import chunks
-import time
+from multiprocessing import Array, Process
+from utils.util import chunks
 
 def calculate_IOU(pred, real):
     """
