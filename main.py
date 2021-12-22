@@ -3,8 +3,6 @@
 import json
 import time
 import argparse
-
-import numpy as np
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -16,6 +14,7 @@ from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
 from utils.util import get_average_image_size, report
+from utils.mixup import Mixup
 
 
 class PolyOptimizer(torch.optim.SGD):
@@ -56,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
+    parser.add_argument("--cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -70,6 +70,7 @@ if __name__ == '__main__':
     testonly = args.test
     ckpt = args.ckpt
     remark = args.note
+    cutmix_alpha = args.cutmix
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(data_path_name='Dataset/2.validation/img', transform=train_transform)
+    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
@@ -187,6 +188,17 @@ if __name__ == '__main__':
     accuracy_t = []
     iou_v = []
     best_val = 0
+
+    #cutmix init
+    if cutmix_alpha == 0:
+        cutmix_enabled = False
+        cutmix_fn = None
+    else:
+        cutmix_enabled = True
+        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
+                        cutmix_minmax=None, prob=1, switch_prob=0, 
+                        mode="batch", correct_lam=True, label_smoothing=0.0,
+                        num_classes=3)
     
     for i in range(epochs):
         count = 0
@@ -198,6 +210,8 @@ if __name__ == '__main__':
             count += 1
             img = img.cuda()
             label = label.cuda()
+            if cutmix_enabled:
+                img, label = cutmix_fn(img, label)
             scores = net(img)
             loss = criteria(scores, label.float())
             
