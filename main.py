@@ -3,6 +3,8 @@
 import json
 import time
 import argparse
+
+import numpy as np
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -69,46 +71,81 @@ if __name__ == '__main__':
     ckpt = args.ckpt
     remark = args.note
 
+    if not os.path.exists('modelstates'):
+        os.mkdir('modelstates')
+    if not os.path.exists('val_image_label'):
+        os.mkdir('val_image_label')
+    if model_name == None:
+        raise Exception("Model name is not provided for the traning phase!")
 
+    # this part is for test the effectiveness of the class activation map
     if testonly:
         if ckpt == None:
             raise Exception("No checkpoint model is provided")
+        
+        # load classification model
+        if useresnet:
+            net = network.wideResNet()
+            model_path = "modelstates/" + ckpt + ".pth"
+            pretrained = torch.load(model_path)['model']
+            net.load_state_dict(pretrained, strict=False)
         else:
-            if useresnet:
-                net_cam = network.wideResNet_cam()
-                model_path = "modelstates/" + ckpt + ".pth"
-                pretrained = torch.load(model_path)['model']
-                # print(pretrained.keys())
-                pretrained = {k[7:]: v for k, v in pretrained.items()}
-                pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-                net_cam.load_state_dict(pretrained)
-            else:
-                net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
-                model_path = "modelstates/" + ckpt + ".pth"
-                pretrained = torch.load(model_path)['model']
-                pretrained = {k[7:]: v for k, v in pretrained.items()}
-                pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-                net_cam.load_state_dict(pretrained)
+            # load classification model
+            net = network.scalenet101(structure_path='network/structures/scalenet101.json')
+            model_path = "modelstates/" + ckpt + ".pth"
+            pretrained = torch.load(model_path)['model']
+            net.load_state_dict(pretrained, strict=False)
+        print('classification model load succeeds')
+        net = torch.nn.DataParallel(net, device_ids=devices).cuda()
+        validation_set = dataset.ValidationDataset(transform=transforms.Compose([
+                transforms.Resize((resize,resize)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]))
+        validation_loader = DataLoader(validation_set, batch_size=1, drop_last=False)
+        predict_labels = {}
+        net.eval()
+        with torch.no_grad():
+            for im, im_name in tqdm(validation_loader):
+                im = im.cuda()
+                im_name = im_name[0]
+                scores = net(im)
+                scores = torch.sigmoid(scores)
+                predict = torch.zeros_like(scores)
+                predict[scores > 0.5] = 1
+                predict[scores < 0.5] = 0
+                predict_labels[im_name] = predict.cpu().numpy().tolist()[0]
+        with open(f'val_image_label/{ckpt}.json', 'w') as fp:
+            json.dump(predict_labels, fp)
+        del net # free the GPU of this net
+        print('finish generate image labels')
+        # create cam model
+        if useresnet:
+            net_cam = network.wideResNet_cam()
+            pretrained = {k[7:]: v for k, v in pretrained.items()}
+            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+            net_cam.load_state_dict(pretrained)
+        else:
+            net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+            pretrained = {k[7:]: v for k, v in pretrained.items()}
+            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+            net_cam.load_state_dict(pretrained)
+            
+        net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
+        print("successfully load model states.")
+        prefix = "resnet" if useresnet else "scalenet"
+        
+        # calculate MIOU
+        validation_cam_folder_name = 'valid_out_cam'
+        validation_dataset_path = 'Dataset/2.validation/img'
+        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, elimate_noise=True, label_path=f'{ckpt}.json')
+        start_time = time.time()
+        valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+        valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
+        print("--- %s seconds ---" % (time.time() - start_time))
+        print(f"test mIOU score is: {valid_iou}")
+        exit()
 
-            net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
-            print("successfully load model states.")
-            prefix = "resnet" if useresnet else "scalenet"
-            # calculate MIOU
-            generate_cam(net_cam, prefix + "_" + model_name, (224, int(224//3)), batch_size, 'valid', resize)
-            start_time = time.time()
-            valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
-            valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
-            print("--- %s seconds ---" % (time.time() - start_time))
-            print(f"test mIOU score is: {valid_iou}")
-            exit()
-
-    if not os.path.exists('modelstates'):
-        os.mkdir('modelstates')
-    if not os.path.exists('valid_out_cam'):
-        os.mkdir('valid_out_cam')
-
-    if model_name == None:
-        raise Exception("Model name is not provided for the traning phase!")
     # load model
     prefix = ""
     if useresnet:
@@ -135,7 +172,7 @@ if __name__ == '__main__':
     # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
+    TrainDataset = dataset.OriginPatchesDataset(data_path_name='Dataset/2.validation/img', transform=train_transform)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
@@ -195,9 +232,14 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            generate_cam(net_cam, prefix + "_" + model_name, (224, int(224//3)), batch_size, 'valid', resize)
+            validation_cam_folder_name = 'valid_out_cam'
+            validation_dataset_path = 'Dataset/2.validation/img'
+            if not os.path.exists(validation_cam_folder_name):
+                os.mkdir(validation_cam_folder_name)
+            
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, elimate_noise=False)
             start_time = time.time()
-            valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+            valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
             iou_v.append(valid_iou)
             print("--- %s seconds ---" % (time.time() - start_time))
