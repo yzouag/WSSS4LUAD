@@ -3,6 +3,7 @@
 import json
 import time
 import argparse
+from numpy import mod
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -14,6 +15,8 @@ from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
 from utils.util import get_average_image_size, report
+from utils.mixup import Mixup
+from torchvision.utils import save_image
 
 
 class PolyOptimizer(torch.optim.SGD):
@@ -54,6 +57,7 @@ if __name__ == '__main__':
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
+    parser.add_argument("--cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -68,6 +72,7 @@ if __name__ == '__main__':
     testonly = args.test
     ckpt = args.ckpt
     remark = args.note
+    cutmix_alpha = args.cutmix
 
 
     if testonly:
@@ -150,6 +155,16 @@ if __name__ == '__main__':
     accuracy_t = []
     iou_v = []
     best_val = 0
+
+    #cutmix init
+    if cutmix_alpha == 0:
+        cutmix_enabled = False
+        cutmix_fn = None
+    else:
+        cutmix_enabled = True
+        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
+                        cutmix_minmax=None, prob=1, switch_prob=0, 
+                        mode="batch", correct_lam=True, num_classes=3)
     
     for i in range(epochs):
         count = 0
@@ -161,6 +176,16 @@ if __name__ == '__main__':
             count += 1
             img = img.cuda()
             label = label.cuda()
+
+            if not os.path.exists('test_mixup'):
+                os.mkdir('test_mixup')
+            for i in range(img.shape[0]):
+                save_image(img[i], f"./test_mixup/original_{i}_{label[i]}.png")
+            if cutmix_enabled:
+                img, label = cutmix_fn(img, label)
+            for i in range(img.shape[0]):
+                save_image(img[i], f"./test_mixup/mixup_{i}_{label[i]}.png")
+
             scores = net(img)
             loss = criteria(scores, label.float())
             
