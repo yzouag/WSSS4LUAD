@@ -17,6 +17,7 @@ from utils.generate_CAM import generate_cam
 from utils.util import get_average_image_size, report
 from utils.mixup import Mixup
 from torchvision.utils import save_image
+import shutil
 
 
 class PolyOptimizer(torch.optim.SGD):
@@ -164,7 +165,8 @@ if __name__ == '__main__':
         cutmix_enabled = True
         cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
                         cutmix_minmax=None, prob=1, switch_prob=0, 
-                        mode="batch", correct_lam=True, num_classes=3)
+                        mode="batch", correct_lam=True, label_smoothing=0.0,
+                        num_classes=3)
     
     for i in range(epochs):
         count = 0
@@ -177,7 +179,8 @@ if __name__ == '__main__':
             img = img.cuda()
             label = label.cuda()
 
-            if not os.path.exists('test_mixup'):
+            if os.path.exists("test_mixup"):
+                shutil.rmtree("test_mixup")
                 os.mkdir('test_mixup')
             for i in range(img.shape[0]):
                 save_image(img[i], f"./test_mixup/original_{i}_{label[i]}.png")

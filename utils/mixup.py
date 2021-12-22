@@ -10,6 +10,13 @@ CutMix: https://github.com/clovaai/CutMix-PyTorch
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+
+"""
+What it does:
+1. generate lambda and bounding box
+2. inverse the batch to apply the mix
+3. same thing to label
+"""
 import numpy as np
 import torch
 
@@ -24,6 +31,15 @@ def mixup_target(target, num_classes, lam=1., smoothing=0.0, device='cuda'):
     on_value = 1. - smoothing + off_value
     y1 = one_hot(target, num_classes, on_value=on_value, off_value=off_value, device=device)
     y2 = one_hot(target.flip(0), num_classes, on_value=on_value, off_value=off_value, device=device)
+    return y1 * lam + y2 * (1. - lam)
+
+def mixup_target_multilabel(target, num_classes, lam=1., smoothing=0.0, device='cuda'):
+    off_value = smoothing / num_classes
+    on_value = 1. - smoothing + off_value
+    # y1 = one_hot(target, num_classes, on_value=on_value, off_value=off_value, device=device)
+    # y2 = one_hot(target.flip(0), num_classes, on_value=on_value, off_value=off_value, device=device)
+    y1 = target
+    y2 = target.flip(0)
     return y1 * lam + y2 * (1. - lam)
 
 
@@ -214,7 +230,7 @@ class Mixup:
             lam = self._mix_pair(x)
         else:
             lam = self._mix_batch(x)
-        target = mixup_target(target, self.num_classes, lam, self.label_smoothing, x.device)
+        target = mixup_target_multilabel(target, self.num_classes, lam, self.label_smoothing, x.device)
         return x, target
 
 
