@@ -33,11 +33,11 @@ def mixup_target(target, num_classes, lam=1., smoothing=0.0, device='cuda'):
     y2 = one_hot(target.flip(0), num_classes, on_value=on_value, off_value=off_value, device=device)
     return y1 * lam + y2 * (1. - lam)
 
+
+#smoothing is useless in this case
 def mixup_target_multilabel(target, num_classes, lam=1., smoothing=0.0, device='cuda'):
     off_value = smoothing / num_classes
     on_value = 1. - smoothing + off_value
-    # y1 = one_hot(target, num_classes, on_value=on_value, off_value=off_value, device=device)
-    # y2 = one_hot(target.flip(0), num_classes, on_value=on_value, off_value=off_value, device=device)
     y1 = target
     y2 = target.flip(0)
     return y1 * lam + y2 * (1. - lam)
