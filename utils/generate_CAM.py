@@ -98,7 +98,7 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
                 sum_counter[sum_counter < 1] = 1
 
                 norm_cam = sum_cam / sum_counter
-                print(torch.tensor([norm_cam]).shape)
+                # print(torch.tensor([norm_cam]).shape)
                 ensemble_cam += F.interpolate(torch.tensor([norm_cam]), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
                 # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
                 # cam_min = np.min(sum_cam, (1, 2), keepdims=True)

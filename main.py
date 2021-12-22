@@ -46,10 +46,13 @@ if __name__ == '__main__':
     parser.add_argument("-epoch", default=20, type=int)
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
-    parser.add_argument("-save_every", default=10, type=int, help="how often to save a model while training")
+    parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
+    parser.add_argument("-test_every", default=2, type=int, help="how often to test a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
-    parser.add_argument('-m', type=str, help='the save model name', required=True)
+    parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
+    parser.add_argument('-test', action='store_true', default=False)
+    parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
     args = parser.parse_args()
 
@@ -58,29 +61,66 @@ if __name__ == '__main__':
     base_lr = args.lr
     resize = args.resize
     save_every = args.save_every
+    test_every = args.test_every
     devices = args.device
     model_name = args.m
     useresnet = args.resnet
+    testonly = args.test
+    ckpt = args.ckpt
     remark = args.note
+
+
+    if testonly:
+        if ckpt == None:
+            raise Exception("No checkpoint model is provided")
+        else:
+            if useresnet:
+                net_cam = network.wideResNet_cam()
+                model_path = "modelstates/" + ckpt + ".pth"
+                pretrained = torch.load(model_path)['model']
+                # print(pretrained.keys())
+                pretrained = {k[7:]: v for k, v in pretrained.items()}
+                pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+                net_cam.load_state_dict(pretrained)
+            else:
+                net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+                model_path = "modelstates/" + ckpt + ".pth"
+                pretrained = torch.load(model_path)['model']
+                pretrained = {k[7:]: v for k, v in pretrained.items()}
+                pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+                net_cam.load_state_dict(pretrained)
+
+            net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
+            print("successfully load model states.")
+            prefix = "resnet" if useresnet else "scalenet"
+            # calculate MIOU
+            generate_cam(net_cam, prefix + "_" + model_name, (224, int(224//3)), batch_size, 'valid', resize)
+            start_time = time.time()
+            valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+            valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
+            print("--- %s seconds ---" % (time.time() - start_time))
+            print(f"test mIOU score is: {valid_iou}")
+            exit()
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
     if not os.path.exists('valid_out_cam'):
         os.mkdir('valid_out_cam')
-    average_image_size = get_average_image_size('Dataset/1.training')
 
+    if model_name == None:
+        raise Exception("Model name is not provided for the traning phase!")
     # load model
     prefix = ""
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
         net = network.wideResNet()
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -92,7 +132,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
+    # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
@@ -141,36 +181,38 @@ if __name__ == '__main__':
         accuracy_t.append(train_loss)
         loss_t.append(train_acc)
 
-        if useresnet:
-            net_cam = network.wideResNet_cam()
-        else:
-            net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+        if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
+            if useresnet:
+                net_cam = network.wideResNet_cam()
+            else:
+                net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
 
-        pretrained = net.state_dict()
-        pretrained = {k[7:]: v for k, v in pretrained.items()}
-        pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-        # pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-        net_cam.load_state_dict(pretrained)
+            pretrained = net.state_dict()
+            pretrained = {k[7:]: v for k, v in pretrained.items()}
+            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+            # pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+            net_cam.load_state_dict(pretrained)
+            net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
+
+            # calculate MIOU
+            generate_cam(net_cam, prefix + "_" + model_name, (224, int(224//3)), batch_size, 'valid', resize)
+            start_time = time.time()
+            valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+            valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
+            iou_v.append(valid_iou)
+            print("--- %s seconds ---" % (time.time() - start_time))
+            
+            if valid_iou > best_val:
+                print("Updating the best model..........................................")
+                best_val = valid_iou
+                torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_best.pth")
         
-        # calculate MIOU
-        generate_cam(net_cam, prefix + model_name, (average_image_size, average_image_size//3), batch_size, 'valid', resize)
-        start_time = time.time()
-        valid_image_path = f'valid_out_cam/{prefix + model_name}'
-        valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
-        iou_v.append(valid_iou)
-        print("--- %s seconds ---" % (time.time() - start_time))
-        
-        if valid_iou > best_val:
-            print("Updating the best model..........................................")
-            best_val = valid_iou
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_best.pth")
-    
-        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
+            print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
 
-        if (i + 1) % save_every == 0 and (i + 1) != epochs:
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_ep"+str(i+1)+".pth")
+        if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
 
-    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + model_name + "_last.pth")
+    torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_last.pth")
 
     plt.figure(1)
     plt.plot(loss_t)
@@ -194,8 +236,8 @@ if __name__ == '__main__':
     plt.title('valid accuracy')
     plt.savefig('./image/valid_iou.png')
 
-    reporter['training_accuracy'] = accuracy_t
-    reporter['best_validation_mIOU'] = best_val
+    # reporter['training_accuracy'] = accuracy_t
+    # reporter['best_validation_mIOU'] = best_val
 
-    with open('result/experiment.json', 'a') as fp:
-        json.dump(reporter, fp)
+    # with open('result/experiment.json', 'a') as fp:
+    #     json.dump(reporter, fp)

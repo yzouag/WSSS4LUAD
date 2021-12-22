@@ -11,7 +11,7 @@ class OriginPatchesDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return len(self.files[:50])
+        return len(self.files)
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
@@ -23,7 +23,7 @@ class OriginPatchesDataset(Dataset):
         return im, label
 
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[0.5, 0.75, 1, 1.5, 2]):
+    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[1]):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform

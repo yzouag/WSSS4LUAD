@@ -197,7 +197,7 @@ def chunks(lst, num_workers=None, n=None):
         print("the function should at least pass one positional argument")
         exit()
     elif n == None:
-        n = np.ceil(len(lst)/num_workers)
+        n = int(np.ceil(len(lst)/num_workers))
         for i in range(0, len(lst), n):
             chunk_list.append(lst[i:i + n])
         return chunk_list
@@ -218,3 +218,5 @@ def report(batch_size, epochs, lr, resize, model_name, back_bone, remark):
     specs['training_image_size'] = resize
     specs['back_bone'] = back_bone
     specs['remark'] = remark
+
+    return specs
