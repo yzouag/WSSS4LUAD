@@ -57,6 +57,13 @@ for the training set, the average size of images is (224, 224).
 2. use x^y for the normal channel (1 - pos.max()) to control the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt
 
 ### 5.improvements: (`train.py`)
-1. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
-2. data synthesis: cut mix in one batch after augmentation (010 mix 100 -> 110, 110 mix 101 -> 111)
-3. activation drop out: randomly drop high acti
+1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174]
+2. large model: resnest269
+3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
+4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32*32*64 in seg, 56*56*16 cls, make sure 7 mixed types are balanced)
+5. generate pseudo mask without model for single label patches (require corrosion and smoothing )
+6. activation drop out: randomly drop high activation
+7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area)
+8. diff loss weights for single-label / multi-label / mixed label
+9. contrastive loss (reduce cosine distance for same category and enlarge it for the different, top2 loss_conl)
+10. post-process: 10.1 drop catogory whose area < 5% in subpatch pseudo-mask generation (top3); 10.2 after bg mask, use knn to indentify small area pixels (top1); 10.3 rm small tumer and stroma in normal (top1)
