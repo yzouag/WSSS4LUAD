@@ -84,50 +84,54 @@ if __name__ == '__main__':
         if ckpt == None:
             raise Exception("No checkpoint model is provided")
         
-        # load classification model
-        if useresnet:
-            net = network.wideResNet()
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            net.load_state_dict(pretrained, strict=False)
-        else:
-            # load classification model
-            net = network.scalenet101(structure_path='network/structures/scalenet101.json')
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            net.load_state_dict(pretrained, strict=False)
-        print('classification model load succeeds')
-        net = torch.nn.DataParallel(net, device_ids=devices).cuda()
-        validation_set = dataset.ValidationDataset(transform=transforms.Compose([
-                transforms.Resize((resize,resize)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ]))
-        validation_loader = DataLoader(validation_set, batch_size=1, drop_last=False)
-        predict_labels = {}
-        net.eval()
-        with torch.no_grad():
-            for im, im_name in tqdm(validation_loader):
-                im = im.cuda()
-                im_name = im_name[0]
-                scores = net(im)
-                scores = torch.sigmoid(scores)
-                predict = torch.zeros_like(scores)
-                predict[scores > 0.5] = 1
-                predict[scores < 0.5] = 0
-                predict_labels[im_name] = predict.cpu().numpy().tolist()[0]
-        with open(f'val_image_label/{ckpt}.json', 'w') as fp:
-            json.dump(predict_labels, fp)
-        del net # free the GPU of this net
-        print('finish generate image labels')
+        # # load classification model
+        # if useresnet:
+        #     net = network.wideResNet()
+        #     model_path = "modelstates/" + ckpt + ".pth"
+        #     pretrained = torch.load(model_path)['model']
+        #     net.load_state_dict(pretrained, strict=False)
+        # else:
+        #     net = network.scalenet101(structure_path='network/structures/scalenet101.json')
+        #     model_path = "modelstates/" + ckpt + ".pth"
+        #     pretrained = torch.load(model_path)['model']
+        #     net.load_state_dict(pretrained, strict=False)
+        # print('classification model load succeeds')
+        # net = torch.nn.DataParallel(net, device_ids=devices).cuda()
+        # validation_set = dataset.ValidationDataset(transform=transforms.Compose([
+        #         transforms.Resize((resize,resize)),
+        #         transforms.ToTensor(),
+        #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        # ]))
+        # validation_loader = DataLoader(validation_set, batch_size=1, drop_last=False)
+        # predict_labels = {}
+        # net.eval()
+        # with torch.no_grad():
+        #     for im, im_name in tqdm(validation_loader):
+        #         im = im.cuda()
+        #         im_name = im_name[0]
+        #         scores = net(im)
+        #         scores = torch.sigmoid(scores)
+        #         predict = torch.zeros_like(scores)
+        #         predict[scores > 0.5] = 1
+        #         predict[scores < 0.5] = 0
+        #         predict_labels[im_name] = predict.cpu().numpy().tolist()[0]
+        # with open(f'val_image_label/{ckpt}.json', 'w') as fp:
+        #     json.dump(predict_labels, fp)
+        # del net # free the GPU of this net
+        # print('finish generate image labels')
+        
         # create cam model
         if useresnet:
             net_cam = network.wideResNet_cam()
+            model_path = "modelstates/" + ckpt + ".pth"
+            pretrained = torch.load(model_path)['model']
             pretrained = {k[7:]: v for k, v in pretrained.items()}
             pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
             net_cam.load_state_dict(pretrained)
         else:
             net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+            model_path = "modelstates/" + ckpt + ".pth"
+            pretrained = torch.load(model_path)['model']
             pretrained = {k[7:]: v for k, v in pretrained.items()}
             pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
             net_cam.load_state_dict(pretrained)
@@ -139,7 +143,8 @@ if __name__ == '__main__':
         # calculate MIOU
         validation_cam_folder_name = 'valid_out_cam'
         validation_dataset_path = 'Dataset/2.validation/img'
-        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, elimate_noise=True, label_path=f'{ckpt}.json')
+        scales = [0.75, 1, 1.25]
+        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=True, label_path=f'groundtruth.json')
         start_time = time.time()
         valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
@@ -152,17 +157,17 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
         net = network.wideResNet()
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
-    scale = (0.25,1)
+    scale = (0.5, 0.75, 1, 1.5, 2.0)
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
@@ -170,7 +175,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
+    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
@@ -250,8 +255,10 @@ if __name__ == '__main__':
             validation_dataset_path = 'Dataset/2.validation/img'
             if not os.path.exists(validation_cam_folder_name):
                 os.mkdir(validation_cam_folder_name)
-            
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, elimate_noise=False)
+
+            scales = [0.75, 1, 1.25]
+            reporter['val_scales'] = scales
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=False)
             start_time = time.time()
             valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
@@ -292,8 +299,8 @@ if __name__ == '__main__':
     plt.title('valid accuracy')
     plt.savefig('./image/valid_iou.png')
 
-    # reporter['training_accuracy'] = accuracy_t
-    # reporter['best_validation_mIOU'] = best_val
+    reporter['training_accuracy'] = accuracy_t
+    reporter['best_validation_mIOU'] = best_val
 
-    # with open('result/experiment.json', 'a') as fp:
-    #     json.dump(reporter, fp)
+    with open('result/experiment.json', 'a') as fp:
+        json.dump(reporter, fp)

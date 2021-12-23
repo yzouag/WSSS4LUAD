@@ -12,7 +12,7 @@ from scipy.stats import mode
 
 # IMPORTANT! Note we DO NOT use the norm in all cases.
 
-def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_name, model_name, elimate_noise=False, label_path=None):
+def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_name, model_name, scales, elimate_noise=False, label_path=None):
     """
     generate the class activation map using the model pass into
 
@@ -38,7 +38,8 @@ def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_n
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ]),
         patch_size=side_length,
-        stride=stride
+        stride=stride,
+        scales=scales
     )
 
     print("Dataset", len(onlineDataset))
@@ -87,7 +88,6 @@ def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_n
 
                 norm_cam = sum_cam / sum_counter
                 norm_cam = F.interpolate(torch.unsqueeze(torch.tensor(norm_cam),0), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
-                
                 # use the image-level label to eliminate impossible pixel classes
                 if elimate_noise:
                     with open(f'val_image_label/{label_path}') as f:
@@ -101,7 +101,7 @@ def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_n
                 ensemble_cam.append(norm_cam)
             
             ensemble_cam = np.stack(ensemble_cam, axis=0)
-            result_label = mode(ensemble_cam, axis=0)
+            result_label = mode(ensemble_cam, axis=0)[0]
             
             if not os.path.exists(f'{cam_folder_name}/{model_name}'):
                 os.mkdir(f'{cam_folder_name}/{model_name}')
