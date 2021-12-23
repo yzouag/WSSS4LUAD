@@ -60,7 +60,7 @@ for the training set, the average size of images is (224, 224).
 1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174]
 2. large model: resnest269
 3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
-4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32*32*64 in seg, 56*56*16 cls, make sure 7 mixed types are balanced)
+4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced)
 5. generate pseudo mask without model for single label patches (require corrosion and smoothing )
 6. activation drop out: randomly drop high activation
 7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area)
