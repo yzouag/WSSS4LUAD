@@ -59,11 +59,13 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
 
     with torch.no_grad():
         for im_path, scaled_im_list, scaled_position_list, scales in tqdm(onlineDataloader):
+            # print(im_path)
             orig_img = np.asarray(Image.open(im_path[0]))
             w, h, _ = orig_img.shape
             ensemble_cam = np.zeros((3, w, h))
 
-            for s in range(len(scales[0])):
+            for s in range(len(scales)):
+                # print(scales)
                 w_ = int(w*scales[s])
                 h_ = int(h*scales[s])
                 interpolatex = side_length
@@ -98,7 +100,7 @@ def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
                 sum_counter[sum_counter < 1] = 1
 
                 norm_cam = sum_cam / sum_counter
-                # print(torch.tensor([norm_cam]).shape)
+                # print(f"scale: scales[{scales[s]}], norm_cam: {norm_cam}")
                 ensemble_cam += F.interpolate(torch.tensor([norm_cam]), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
                 # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
                 # cam_min = np.min(sum_cam, (1, 2), keepdims=True)

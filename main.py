@@ -43,7 +43,7 @@ class PolyOptimizer(torch.optim.SGD):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-batch", default=20, type=int)
-    parser.add_argument("-epoch", default=20, type=int)
+    parser.add_argument("-epoch", default=36, type=int)
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
     parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
@@ -92,11 +92,11 @@ if __name__ == '__main__':
 
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
             print("successfully load model states.")
-            prefix = "resnet" if useresnet else "scalenet"
+            # prefix = "resnet" if useresnet else "scalenet"
             # calculate MIOU
-            generate_cam(net_cam, prefix + "_" + model_name, (224, int(224//3)), batch_size, 'valid', resize)
+            generate_cam(net_cam, ckpt, (224, int(224//3)), batch_size, 'valid', resize)
             start_time = time.time()
-            valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+            valid_image_path = f'valid_out_cam/{ckpt}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
             print("--- %s seconds ---" % (time.time() - start_time))
             print(f"test mIOU score is: {valid_iou}")
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
-    scale = (0.25,1)
+    scale = (0.5,1)
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
@@ -178,9 +178,10 @@ if __name__ == '__main__':
         
         train_loss = running_loss / count
         train_acc = correct / (count * batch_size)
-        accuracy_t.append(train_loss)
-        loss_t.append(train_acc)
-
+        accuracy_t.append(train_acc)
+        loss_t.append(train_loss)
+        valid_iou = 0
+        
         if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
             if useresnet:
                 net_cam = network.wideResNet_cam()
@@ -207,7 +208,7 @@ if __name__ == '__main__':
                 best_val = valid_iou
                 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_best.pth")
         
-            print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
+        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
 
         if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
             torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")

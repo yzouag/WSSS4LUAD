@@ -23,7 +23,7 @@ class OriginPatchesDataset(Dataset):
         return im, label
 
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[1]):
+    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[1, 1.5, 2]):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
