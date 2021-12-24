@@ -58,7 +58,6 @@ def get_overall_valid_score(pred_image_path, num_workers=5):
     Returns:
         float: the mIOU score
     """
-
     l = np.random.permutation(40)
     image_list = chunks(l, num_workers)
 
@@ -96,8 +95,8 @@ def get_overall_valid_score(pred_image_path, num_workers=5):
         p_list.append(p)
     for p in p_list:
         p.join()
-    class0 = intersection[0]/union[0]
-    class1 = intersection[1]/union[1]
-    class2 = intersection[2]/union[2]
+    class0 = intersection[0]/(union[0]+0.000001)
+    class1 = intersection[1]/(union[1]+0.000001)
+    class2 = intersection[2]/(union[2]+0.000001)
     return (class0 + class1 + class2)/3
 

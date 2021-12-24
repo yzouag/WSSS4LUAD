@@ -2,8 +2,7 @@ from torch.utils.data import Dataset
 import os
 import numpy as np
 from PIL import Image
-import torch
-from utils.util import online_cut_patches, multiscale_online_crop
+from utils.util import multiscale_online_crop
 class OriginPatchesDataset(Dataset):
     def __init__(self, data_path_name = "Dataset/1.training", transform=None):
         self.path = data_path_name
@@ -22,8 +21,24 @@ class OriginPatchesDataset(Dataset):
         label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
         return im, label
 
+class ValidationDataset(Dataset):
+    def __init__(self, data_path_name = "Dataset/2.validation/img", transform=None):
+        self.path = data_path_name
+        self.files = os.listdir(data_path_name)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+        if self.transform:
+            im = self.transform(im)
+        return im, self.files[idx]
+
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[1, 1.5, 2]):
+    def __init__(self, data_path_name, transform, patch_size, stride, scales):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
@@ -43,7 +58,7 @@ class OnlineDataset(Dataset):
                 for patch_id in range(len(im_list)):
                     im_list[patch_id] = self.transform(im_list[patch_id])
 
-        return image_path, scaled_im_list, scaled_position_list, self.scales
+        return self.files[idx], scaled_im_list, scaled_position_list, self.scales
 
 # class OnlineTrainDataset(Dataset):
 #     def __init__(self, data_path_name, transform=None):
