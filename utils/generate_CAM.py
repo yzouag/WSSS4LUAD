@@ -24,6 +24,9 @@ def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_n
         dataset_path (string): the address of the image dataset
         cam_folder_name (string): the folder to store the cam output
         model_name (string): the name for this cam_output model
+        scales (list): a list of different scales to do model ensemble
+        eliminate_noise: if use image-level label to cancel some of the noise
+        label_path (string): if `eliminate_noise` is True, input the labels path
     """
 
     net.cuda()

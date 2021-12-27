@@ -10,7 +10,8 @@ class OriginPatchesDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return len(self.files)
+        # return len(self.files)
+        return 50
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])

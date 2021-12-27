@@ -56,6 +56,8 @@ if __name__ == '__main__':
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
     parser.add_argument("--cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
+    parser.add_argument("-adl_threshold", type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
+    parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -71,11 +73,15 @@ if __name__ == '__main__':
     ckpt = args.ckpt
     remark = args.note
     cutmix_alpha = args.cutmix
+    adl_threshold = args.adl_threshold
+    adl_drop_rate = args.adl_drop_rate
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
     if not os.path.exists('val_image_label'):
         os.mkdir('val_image_label')
+    if not os.path.exists('result'):
+        os.mkdir('result')
     if model_name == None:
         raise Exception("Model name is not provided for the traning phase!")
 
@@ -143,7 +149,7 @@ if __name__ == '__main__':
         # calculate MIOU
         validation_cam_folder_name = 'valid_out_cam'
         validation_dataset_path = 'Dataset/2.validation/img'
-        scales = [0.75, 1, 1.25]
+        scales = [1, 1.5, 1.75, 2, 2.25]
         generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=True, label_path=f'groundtruth.json')
         start_time = time.time()
         valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
@@ -158,7 +164,10 @@ if __name__ == '__main__':
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
-        net = network.wideResNet()
+        if adl_drop_rate == 0:
+            net = network.wideResNet()
+        else:
+            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
@@ -282,7 +291,7 @@ if __name__ == '__main__':
     plt.ylabel('loss')
     plt.xlabel('epochs')
     plt.title('train loss')
-    plt.savefig('./image/train_loss.png')
+    plt.savefig('./result/train_loss.png')
     plt.close()
 
     plt.figure(2)
@@ -290,14 +299,14 @@ if __name__ == '__main__':
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
     plt.title('train accuracy')
-    plt.savefig('./image/train_accuracy.png')
+    plt.savefig('./result/train_accuracy.png')
 
     plt.figure(3)
     plt.plot(iou_v)
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
     plt.title('valid accuracy')
-    plt.savefig('./image/valid_iou.png')
+    plt.savefig('./result/valid_iou.png')
 
     reporter['training_accuracy'] = accuracy_t
     reporter['best_validation_mIOU'] = best_val

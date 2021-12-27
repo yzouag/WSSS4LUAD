@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 import numpy as np
-
 import torch.nn.functional as F
+from network.adl import ADL
 class ResBlock(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, stride=1, first_dilation=None, dilation=1):
         super(ResBlock, self).__init__()
@@ -117,8 +117,13 @@ class Normalize():
         return proc_img
 
 class wideResNet(nn.Module):
-    def __init__(self):
+    def __init__(self, adl_drop_rate=None, adl_threshold=None):
         super(wideResNet, self).__init__()
+
+        # add attention dropout layers
+        self.adl_drop_rate = adl_drop_rate
+        self.adl_threshold = adl_threshold
+        self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
 
         self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 
@@ -175,6 +180,8 @@ class wideResNet(nn.Module):
         x = self.b4_3(x)
         x = self.b4_4(x)
         x = self.b4_5(x)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
 
         x, conv4 = self.b5(x, get_x_bn_relu=True)
         x = self.b5_1(x)
@@ -183,6 +190,8 @@ class wideResNet(nn.Module):
         x, conv5 = self.b6(x, get_x_bn_relu=True)
 
         x = self.b7(x)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
         conv6 = F.relu(self.bn7(x))
         result = torch.cat([conv4, conv5, conv6], dim=1)
         result = self.pool(result)
