@@ -44,11 +44,11 @@ class PolyOptimizer(torch.optim.SGD):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-batch", default=20, type=int)
-    parser.add_argument("-epoch", default=20, type=int)
+    parser.add_argument("-epoch", default=36, type=int)
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
     parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
-    parser.add_argument("-test_every", default=2, type=int, help="how often to test a model while training")
+    parser.add_argument("-test_every", default=5, type=int, help="how often to test a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
@@ -144,20 +144,21 @@ if __name__ == '__main__':
             
         net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
         print("successfully load model states.")
-        prefix = "resnet" if useresnet else "scalenet"
         
         # calculate MIOU
         validation_cam_folder_name = 'valid_out_cam'
         validation_dataset_path = 'Dataset/2.validation/img'
-        scales = [1, 1.5, 1.75, 2, 2.25]
-        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=True, label_path=f'groundtruth.json')
+        scales = [0.75, 1, 1.25]
+        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
         start_time = time.time()
-        valid_image_path = f'valid_out_cam/{prefix + "_" + model_name}'
+        valid_image_path = f'valid_out_cam/{ckpt}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         print("--- %s seconds ---" % (time.time() - start_time))
         print(f"test mIOU score is: {valid_iou}")
         exit()
 
+    if model_name == None:
+        raise Exception("Model name is not provided for the traning phase!")
     # load model
     prefix = ""
     if useresnet:
@@ -176,7 +177,7 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
-    scale = (0.5, 0.75, 1, 1.5, 2.0)
+    scale = (0.5, 1)
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
@@ -205,9 +206,11 @@ if __name__ == '__main__':
 
     #cutmix init
     if cutmix_alpha == 0:
+        print("cutmix not enabled!")
         cutmix_enabled = False
         cutmix_fn = None
     else:
+        print("cutmix enabled!")
         cutmix_enabled = True
         cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
                         cutmix_minmax=None, prob=1, switch_prob=0, 
@@ -243,8 +246,8 @@ if __name__ == '__main__':
         
         train_loss = running_loss / count
         train_acc = correct / (count * batch_size)
-        accuracy_t.append(train_loss)
-        loss_t.append(train_acc)
+        accuracy_t.append(train_acc)
+        loss_t.append(train_loss)
 
         if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
             if useresnet:
@@ -267,7 +270,7 @@ if __name__ == '__main__':
 
             scales = [0.75, 1, 1.25]
             reporter['val_scales'] = scales
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=False)
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=False, majority_vote=False)
             start_time = time.time()
             valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)

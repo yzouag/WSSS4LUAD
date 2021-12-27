@@ -39,7 +39,7 @@ class ValidationDataset(Dataset):
         return im, self.files[idx]
 
 class OnlineDataset(Dataset):
-    def __init__(self, data_path_name, transform=None, patch_size = 224, stride=74, scales=[0.5, 0.75, 1, 1.25, 1.5]):
+    def __init__(self, data_path_name, transform, patch_size, stride, scales):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
