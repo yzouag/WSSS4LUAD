@@ -81,9 +81,11 @@ if __name__ == '__main__':
         os.mkdir('result')
     validation_cam_folder_name = 'valid_out_cam'
     validation_dataset_path = 'Dataset/2.validation/img'
-    scales = [0.75, 1, 1.25]
+    scales = [1, 1.25, 1.5, 1.75, 2]
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
+
+    # can be commented once the crop is done in later trainings
     print('crop validation set images ...')
     crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
     print('cropping finishes!')
@@ -181,7 +183,7 @@ if __name__ == '__main__':
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
     ])
     reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
@@ -262,7 +264,7 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=False, majority_vote=False, is_valid=True)
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
             valid_image_path = f'{validation_cam_folder_name}/{model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
             iou_v.append(valid_iou)

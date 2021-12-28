@@ -223,6 +223,19 @@ def report(batch_size, epochs, lr, resize, model_name, back_bone, remark, scales
     return specs
 
 def crop_validation_images(dataset_path, side_length, stride, scales, validation_cam_folder_name):
+    """
+    if the scales are not modified, this function can run only once.
+    crop the validation images to reduce the validation time
+    the output is in `validation_cam_folder_name/crop_images`
+    images are stored according to the image name
+
+    Args:
+        dataset_path (str): the validation dataset path
+        side_length (int): the crop size
+        stride (int): the distance between two crops
+        scales (list): a list of scales to crop
+        validation_cam_folder_name (str): the destination to store the validation cam
+    """
     png_images = os.listdir(dataset_path)
     if not os.path.exists(f'{validation_cam_folder_name}/crop_images'):
         os.mkdir(f'{validation_cam_folder_name}/crop_images')
