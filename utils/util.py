@@ -206,7 +206,7 @@ def chunks(lst, num_workers=None, n=None):
             chunk_list.append(lst[i:i + n])
         return chunk_list
 
-def report(batch_size, epochs, lr, resize, model_name, back_bone, remark):
+def report(batch_size, epochs, lr, resize, model_name, back_bone, remark, scales):
     """
     create the reporter dict, record important information in the experiment
     """
@@ -218,5 +218,22 @@ def report(batch_size, epochs, lr, resize, model_name, back_bone, remark):
     specs['training_image_size'] = resize
     specs['back_bone'] = back_bone
     specs['remark'] = remark
+    specs['scales'] = scales
 
     return specs
+
+def crop_validation_images(dataset_path, side_length, stride, scales, validation_cam_folder_name):
+    png_images = os.listdir(dataset_path)
+    if not os.path.exists(f'{validation_cam_folder_name}/crop_images'):
+        os.mkdir(f'{validation_cam_folder_name}/crop_images')
+    for png_image in png_images:
+        if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}'):
+            os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}')
+        image_path = os.path.join(dataset_path, png_image)
+        im = np.asarray(Image.open(image_path))
+        scaled_im_list, scaled_position_list = multiscale_online_crop(im, side_length, stride, scales)
+        for i in range(len(scales)):
+            if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}'):
+                os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}')
+            for j in range(len(scaled_im_list[i])):
+                scaled_im_list[i][j].save(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}/{scaled_position_list[i][j]}.png')

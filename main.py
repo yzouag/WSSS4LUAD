@@ -1,7 +1,4 @@
-# this file uses images without crop to train the model
-# purpose: is crop really useful?
 import json
-import time
 import argparse
 import torch
 from tqdm import tqdm
@@ -13,7 +10,7 @@ import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
-from utils.util import get_average_image_size, report
+from utils.util import crop_validation_images, get_average_image_size, report
 from utils.mixup import Mixup
 
 
@@ -82,8 +79,14 @@ if __name__ == '__main__':
         os.mkdir('val_image_label')
     if not os.path.exists('result'):
         os.mkdir('result')
-    if model_name == None:
-        raise Exception("Model name is not provided for the traning phase!")
+    validation_cam_folder_name = 'valid_out_cam'
+    validation_dataset_path = 'Dataset/2.validation/img'
+    scales = [0.75, 1, 1.25]
+    if not os.path.exists(validation_cam_folder_name):
+        os.mkdir(validation_cam_folder_name)
+    print('crop validation set images ...')
+    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    print('cropping finishes!')
 
     # this part is for test the effectiveness of the class activation map
     if testonly:
@@ -146,14 +149,9 @@ if __name__ == '__main__':
         print("successfully load model states.")
         
         # calculate MIOU
-        validation_cam_folder_name = 'valid_out_cam'
-        validation_dataset_path = 'Dataset/2.validation/img'
-        scales = [0.75, 1, 1.25]
-        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-        start_time = time.time()
+        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
         valid_image_path = f'valid_out_cam/{ckpt}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
-        print("--- %s seconds ---" % (time.time() - start_time))
         print(f"test mIOU score is: {valid_iou}")
         exit()
 
@@ -164,7 +162,7 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
             net = network.wideResNet()
         else:
@@ -173,7 +171,7 @@ if __name__ == '__main__':
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -216,6 +214,7 @@ if __name__ == '__main__':
                         cutmix_minmax=None, prob=1, switch_prob=0, 
                         mode="batch", correct_lam=True, label_smoothing=0.0,
                         num_classes=3)
+
     
     for i in range(epochs):
         count = 0
@@ -263,19 +262,10 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            validation_cam_folder_name = 'valid_out_cam'
-            validation_dataset_path = 'Dataset/2.validation/img'
-            if not os.path.exists(validation_cam_folder_name):
-                os.mkdir(validation_cam_folder_name)
-
-            scales = [0.75, 1, 1.25]
-            reporter['val_scales'] = scales
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=False, majority_vote=False)
-            start_time = time.time()
-            valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=False, majority_vote=False, is_valid=True)
+            valid_image_path = f'{validation_cam_folder_name}/{model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
             iou_v.append(valid_iou)
-            print("--- %s seconds ---" % (time.time() - start_time))
             
             if valid_iou > best_val:
                 print("Updating the best model..........................................")

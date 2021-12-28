@@ -1,3 +1,4 @@
+import re
 from torch.utils.data import Dataset
 import os
 import numpy as np
@@ -61,19 +62,20 @@ class OnlineDataset(Dataset):
 
         return self.files[idx], scaled_im_list, scaled_position_list, self.scales
 
-# class OnlineTrainDataset(Dataset):
-#     def __init__(self, data_path_name, transform=None):
-#         self.path = data_path_name
-#         self.files = os.listdir(data_path_name)
-#         self.transform = transform
+class OfflineDataset(Dataset):
+    def __init__(self, dataset_path, transform):
+        self.path = dataset_path
+        self.files = os.listdir(self.path)
+        self.transform = transform
 
-#     def __len__(self):
-#         return len(self.files)
+    def __len__(self):
+        return len(self.files)
 
-#     def __getitem__(self, idx):
-#         image_path = os.path.join(self.path, self.files[idx])
-#         im = Image.open(image_path)
-#         if self.transform:
-#             im = self.transform(im)
-
-#         return image_path, im 
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.path, self.files[idx])
+        im = Image.open(image_path)
+        positions = self.files[idx]
+        positions = list(map(lambda x: int(x), re.findall(r'\d+', positions)))
+        if self.transform:
+            im = self.transform(im)
+        return im, np.array(positions)
