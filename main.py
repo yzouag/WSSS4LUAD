@@ -85,7 +85,7 @@ if __name__ == '__main__':
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    # crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
     print('cropping finishes!')
 
     # this part is for test the effectiveness of the class activation map
@@ -160,14 +160,20 @@ if __name__ == '__main__':
     # load model
     prefix = ""
     if useresnet:
-        prefix = "resnet"
-        resnet38_path = "weights/res38d.pth"
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
-        if adl_drop_rate == 0:
-            net = network.wideResNet()
-        else:
-            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
-        net.load_state_dict(torch.load(resnet38_path), strict=False)
+        # prefix = "resnet"
+        # resnet38_path = "weights/res38d.pth"
+        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
+        # if adl_drop_rate == 0:
+        #     net = network.wideResNet()
+        # else:
+        #     net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
+        # net.load_state_dict(torch.load(resnet38_path), strict=False)
+
+        prefix = "resnest"
+        resnest269_path = "weights/resnest269-0cc87c48.pth"
+        net = network.resnest269()
+        net.load_state_dict(torch.load(resnest269_path),strict=False)
+
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
@@ -183,7 +189,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
+    # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
@@ -301,8 +307,8 @@ if __name__ == '__main__':
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
 
-    reporter['training_accuracy'] = accuracy_t
-    reporter['best_validation_mIOU'] = best_val
+    # reporter['training_accuracy'] = accuracy_t
+    # reporter['best_validation_mIOU'] = best_val
 
     with open('result/experiment.json', 'a') as fp:
         json.dump(reporter, fp)
