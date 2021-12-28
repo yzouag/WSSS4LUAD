@@ -123,7 +123,8 @@ class wideResNet(nn.Module):
         # add attention dropout layers
         self.adl_drop_rate = adl_drop_rate
         self.adl_threshold = adl_threshold
-        self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
+        if adl_drop_rate is not None:
+            self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
 
         self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 

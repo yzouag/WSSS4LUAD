@@ -39,7 +39,7 @@ def generate_cam(net, model_crop, batch_size, resize, dataset_path, cam_folder_n
         transform=transforms.Compose([
             transforms.Resize((resize,resize)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
         ]),
         patch_size=side_length,
         stride=stride,

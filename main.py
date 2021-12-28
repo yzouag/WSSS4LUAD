@@ -82,8 +82,6 @@ if __name__ == '__main__':
         os.mkdir('val_image_label')
     if not os.path.exists('result'):
         os.mkdir('result')
-    if model_name == None:
-        raise Exception("Model name is not provided for the traning phase!")
 
     # this part is for test the effectiveness of the class activation map
     if testonly:
@@ -148,7 +146,7 @@ if __name__ == '__main__':
         # calculate MIOU
         validation_cam_folder_name = 'valid_out_cam'
         validation_dataset_path = 'Dataset/2.validation/img'
-        scales = [0.75, 1, 1.25]
+        scales = [1, 1.25, 1.5, 1.75, 2]
         generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
         start_time = time.time()
         valid_image_path = f'valid_out_cam/{ckpt}'
@@ -166,6 +164,7 @@ if __name__ == '__main__':
         resnet38_path = "weights/res38d.pth"
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
         if adl_drop_rate == 0:
+            print("Original Network used.")
             net = network.wideResNet()
         else:
             net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
@@ -182,13 +181,24 @@ if __name__ == '__main__':
         transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        # transforms.ToTensor(),
+        transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
     ])
     reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
+    #cutmix init
+    if cutmix_alpha == 0:
+        print("cutmix not enabled!")
+        cutmix_fn = None
+    else:
+        print("cutmix enabled!")
+        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
+                        cutmix_minmax=[0.25, 0.75], prob=1, switch_prob=0, 
+                        mode="single", correct_lam=True, label_smoothing=0.0,
+                        num_classes=3)
+
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
+    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform, cutmix_fn=cutmix_fn)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
@@ -200,55 +210,41 @@ if __name__ == '__main__':
 
     # train loop
     loss_t = []
-    accuracy_t = []
+    # accuracy_t = []
     iou_v = []
     best_val = 0
-
-    #cutmix init
-    if cutmix_alpha == 0:
-        print("cutmix not enabled!")
-        cutmix_enabled = False
-        cutmix_fn = None
-    else:
-        print("cutmix enabled!")
-        cutmix_enabled = True
-        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
-                        cutmix_minmax=None, prob=1, switch_prob=0, 
-                        mode="batch", correct_lam=True, label_smoothing=0.0,
-                        num_classes=3)
     
     for i in range(epochs):
         count = 0
         running_loss = 0.
-        correct = 0
+        # correct = 0
         net.train()
 
         for img, label in tqdm(TrainDataloader):
             count += 1
             img = img.cuda()
             label = label.cuda()
-            if cutmix_enabled:
-                img, label = cutmix_fn(img, label)
             scores = net(img)
             loss = criteria(scores, label.float())
             
-            scores = torch.sigmoid(scores)
-            predict = torch.zeros_like(scores)
-            predict[scores > 0.5] = 1
-            predict[scores < 0.5] = 0
-            for k in range(len(predict)):
-                if torch.equal(predict[k], label[k]):
-                    correct += 1
+            # scores = torch.sigmoid(scores)
+            # predict = torch.zeros_like(scores)
+            # predict[scores > 0.5] = 1
+            # predict[scores < 0.5] = 0
+            # for k in range(len(predict)):
+                # if torch.equal(predict[k], label[k]):
+                    # correct += 1
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
         
         train_loss = running_loss / count
-        train_acc = correct / (count * batch_size)
-        accuracy_t.append(train_acc)
+        # train_acc = correct / (count * batch_size)
+        # accuracy_t.append(train_acc)
         loss_t.append(train_loss)
 
+        valid_iou = 0
         if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
             if useresnet:
                 net_cam = network.wideResNet_cam()
@@ -268,9 +264,9 @@ if __name__ == '__main__':
             if not os.path.exists(validation_cam_folder_name):
                 os.mkdir(validation_cam_folder_name)
 
-            scales = [0.75, 1, 1.25]
+            scales = [1, 1.25, 1.5, 1.75, 2]
             reporter['val_scales'] = scales
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=False, majority_vote=False)
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
             start_time = time.time()
             valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
@@ -282,7 +278,7 @@ if __name__ == '__main__':
                 best_val = valid_iou
                 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_best.pth")
         
-            print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
+        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}')
 
         if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
             torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
@@ -297,21 +293,21 @@ if __name__ == '__main__':
     plt.savefig('./result/train_loss.png')
     plt.close()
 
-    plt.figure(2)
-    plt.plot(accuracy_t)
-    plt.ylabel('accuracy')
-    plt.xlabel('epochs')
-    plt.title('train accuracy')
-    plt.savefig('./result/train_accuracy.png')
+    # plt.figure(2)
+    # plt.plot(accuracy_t)
+    # plt.ylabel('accuracy')
+    # plt.xlabel('epochs')
+    # plt.title('train accuracy')
+    # plt.savefig('./result/train_accuracy.png')
 
-    plt.figure(3)
+    plt.figure(2)
     plt.plot(iou_v)
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
 
-    reporter['training_accuracy'] = accuracy_t
+    # reporter['training_accuracy'] = accuracy_t
     reporter['best_validation_mIOU'] = best_val
 
     with open('result/experiment.json', 'a') as fp:
