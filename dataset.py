@@ -48,8 +48,8 @@ class OriginPatchesDataset(Dataset):
         if self.cutmix_fn and label.sum() == 1:
             # choose a single label category based on the current distribution
             relative_labels = find_relative_label(tuple(label))
-            current_numbers = np.array([self.statedic[relative_labels[0]], self.statedic[relative_labels[1]], self.statedic[relative_labels[2]]])
-            current_probability = [(1/current_numbers[0])/current_numbers.sum(), (1/current_numbers[1])/current_numbers.sum(), (1/current_numbers[2])/current_numbers.sum()]
+            current_numbers = np.array([(1/self.statedic[relative_labels[0]]), (1/self.statedic[relative_labels[1]]), (1/self.statedic[relative_labels[2]])])
+            current_probability = [(current_numbers[0])/current_numbers.sum(), (current_numbers[1])/current_numbers.sum(), (current_numbers[2])/current_numbers.sum()]
             activate = np.random.choice([0, 1, 2], p=current_probability)
             mixcategory = np.array((0, 0, 0))
             mixcategory[activate] = 1
