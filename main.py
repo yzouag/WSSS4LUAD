@@ -1,7 +1,4 @@
-# this file uses images without crop to train the model
-# purpose: is crop really useful?
 import json
-import time
 import argparse
 import torch
 from tqdm import tqdm
@@ -13,7 +10,7 @@ import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
-from utils.util import get_average_image_size, report
+from utils.util import crop_validation_images, get_average_image_size, report
 from utils.mixup import Mixup
 
 
@@ -82,76 +79,41 @@ if __name__ == '__main__':
         os.mkdir('val_image_label')
     if not os.path.exists('result'):
         os.mkdir('result')
+    validation_cam_folder_name = 'valid_out_cam'
+    validation_dataset_path = 'Dataset/2.validation/img'
+    scales = [1, 1.25, 1.5, 1.75, 2]
+    if not os.path.exists(validation_cam_folder_name):
+        os.mkdir(validation_cam_folder_name)
+
+    # can be commented once the crop is done in later trainings
+    print('crop validation set images ...')
+    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    print('cropping finishes!')
 
     # this part is for test the effectiveness of the class activation map
     if testonly:
         if ckpt == None:
             raise Exception("No checkpoint model is provided")
         
-        # # load classification model
-        # if useresnet:
-        #     net = network.wideResNet()
-        #     model_path = "modelstates/" + ckpt + ".pth"
-        #     pretrained = torch.load(model_path)['model']
-        #     net.load_state_dict(pretrained, strict=False)
-        # else:
-        #     net = network.scalenet101(structure_path='network/structures/scalenet101.json')
-        #     model_path = "modelstates/" + ckpt + ".pth"
-        #     pretrained = torch.load(model_path)['model']
-        #     net.load_state_dict(pretrained, strict=False)
-        # print('classification model load succeeds')
-        # net = torch.nn.DataParallel(net, device_ids=devices).cuda()
-        # validation_set = dataset.ValidationDataset(transform=transforms.Compose([
-        #         transforms.Resize((resize,resize)),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        # ]))
-        # validation_loader = DataLoader(validation_set, batch_size=1, drop_last=False)
-        # predict_labels = {}
-        # net.eval()
-        # with torch.no_grad():
-        #     for im, im_name in tqdm(validation_loader):
-        #         im = im.cuda()
-        #         im_name = im_name[0]
-        #         scores = net(im)
-        #         scores = torch.sigmoid(scores)
-        #         predict = torch.zeros_like(scores)
-        #         predict[scores > 0.5] = 1
-        #         predict[scores < 0.5] = 0
-        #         predict_labels[im_name] = predict.cpu().numpy().tolist()[0]
-        # with open(f'val_image_label/{ckpt}.json', 'w') as fp:
-        #     json.dump(predict_labels, fp)
-        # del net # free the GPU of this net
-        # print('finish generate image labels')
-        
         # create cam model
         if useresnet:
             net_cam = network.wideResNet_cam()
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            pretrained = {k[7:]: v for k, v in pretrained.items()}
-            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-            net_cam.load_state_dict(pretrained)
         else:
             net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            pretrained = {k[7:]: v for k, v in pretrained.items()}
-            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-            net_cam.load_state_dict(pretrained)
+            
+        model_path = "modelstates/" + ckpt + ".pth"
+        pretrained = torch.load(model_path)['model']
+        pretrained = {k[7:]: v for k, v in pretrained.items()}
+        pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+        net_cam.load_state_dict(pretrained)
             
         net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
         print("successfully load model states.")
         
         # calculate MIOU
-        validation_cam_folder_name = 'valid_out_cam'
-        validation_dataset_path = 'Dataset/2.validation/img'
-        scales = [1, 1.25, 1.5, 1.75, 2]
-        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-        start_time = time.time()
+        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
         valid_image_path = f'valid_out_cam/{ckpt}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
-        print("--- %s seconds ---" % (time.time() - start_time))
         print(f"test mIOU score is: {valid_iou}")
         exit()
 
@@ -162,7 +124,7 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
             print("Original Network used.")
             net = network.wideResNet()
@@ -172,7 +134,7 @@ if __name__ == '__main__':
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -259,19 +221,10 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            validation_cam_folder_name = 'valid_out_cam'
-            validation_dataset_path = 'Dataset/2.validation/img'
-            if not os.path.exists(validation_cam_folder_name):
-                os.mkdir(validation_cam_folder_name)
-
-            scales = [1, 1.25, 1.5, 1.75, 2]
-            reporter['val_scales'] = scales
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, prefix + "_" + model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-            start_time = time.time()
-            valid_image_path = f'{validation_cam_folder_name}/{prefix + "_" + model_name}'
+            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
+            valid_image_path = f'{validation_cam_folder_name}/{model_name}'
             valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
             iou_v.append(valid_iou)
-            print("--- %s seconds ---" % (time.time() - start_time))
             
             if valid_iou > best_val:
                 print("Updating the best model..........................................")
