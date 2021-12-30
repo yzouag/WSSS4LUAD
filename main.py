@@ -95,57 +95,17 @@ if __name__ == '__main__':
         if ckpt == None:
             raise Exception("No checkpoint model is provided")
         
-        # # load classification model
-        # if useresnet:
-        #     net = network.wideResNet()
-        #     model_path = "modelstates/" + ckpt + ".pth"
-        #     pretrained = torch.load(model_path)['model']
-        #     net.load_state_dict(pretrained, strict=False)
-        # else:
-        #     net = network.scalenet101(structure_path='network/structures/scalenet101.json')
-        #     model_path = "modelstates/" + ckpt + ".pth"
-        #     pretrained = torch.load(model_path)['model']
-        #     net.load_state_dict(pretrained, strict=False)
-        # print('classification model load succeeds')
-        # net = torch.nn.DataParallel(net, device_ids=devices).cuda()
-        # validation_set = dataset.ValidationDataset(transform=transforms.Compose([
-        #         transforms.Resize((resize,resize)),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        # ]))
-        # validation_loader = DataLoader(validation_set, batch_size=1, drop_last=False)
-        # predict_labels = {}
-        # net.eval()
-        # with torch.no_grad():
-        #     for im, im_name in tqdm(validation_loader):
-        #         im = im.cuda()
-        #         im_name = im_name[0]
-        #         scores = net(im)
-        #         scores = torch.sigmoid(scores)
-        #         predict = torch.zeros_like(scores)
-        #         predict[scores > 0.5] = 1
-        #         predict[scores < 0.5] = 0
-        #         predict_labels[im_name] = predict.cpu().numpy().tolist()[0]
-        # with open(f'val_image_label/{ckpt}.json', 'w') as fp:
-        #     json.dump(predict_labels, fp)
-        # del net # free the GPU of this net
-        # print('finish generate image labels')
-        
         # create cam model
         if useresnet:
             net_cam = network.wideResNet_cam()
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            pretrained = {k[7:]: v for k, v in pretrained.items()}
-            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-            net_cam.load_state_dict(pretrained)
         else:
             net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
-            model_path = "modelstates/" + ckpt + ".pth"
-            pretrained = torch.load(model_path)['model']
-            pretrained = {k[7:]: v for k, v in pretrained.items()}
-            pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-            net_cam.load_state_dict(pretrained)
+            
+        model_path = "modelstates/" + ckpt + ".pth"
+        pretrained = torch.load(model_path)['model']
+        pretrained = {k[7:]: v for k, v in pretrained.items()}
+        pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+        net_cam.load_state_dict(pretrained)
             
         net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
         print("successfully load model states.")
@@ -166,6 +126,7 @@ if __name__ == '__main__':
         resnet38_path = "weights/res38d.pth"
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
+            print("Original Network used.")
             net = network.wideResNet()
         else:
             net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
@@ -182,13 +143,24 @@ if __name__ == '__main__':
         transforms.RandomResizedCrop(size=resize, scale=scale),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),
+        # transforms.ToTensor(),
         transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
     ])
     reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
+    #cutmix init
+    if cutmix_alpha == 0:
+        print("cutmix not enabled!")
+        cutmix_fn = None
+    else:
+        print("cutmix enabled!")
+        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
+                        cutmix_minmax=[0.25, 0.75], prob=1, switch_prob=0, 
+                        mode="single", correct_lam=True, label_smoothing=0.0,
+                        num_classes=3)
+
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform)
+    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform, cutmix_fn=cutmix_fn)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
@@ -200,56 +172,41 @@ if __name__ == '__main__':
 
     # train loop
     loss_t = []
-    accuracy_t = []
+    # accuracy_t = []
     iou_v = []
     best_val = 0
-
-    #cutmix init
-    if cutmix_alpha == 0:
-        print("cutmix not enabled!")
-        cutmix_enabled = False
-        cutmix_fn = None
-    else:
-        print("cutmix enabled!")
-        cutmix_enabled = True
-        cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
-                        cutmix_minmax=None, prob=1, switch_prob=0, 
-                        mode="batch", correct_lam=True, label_smoothing=0.0,
-                        num_classes=3)
-
     
     for i in range(epochs):
         count = 0
         running_loss = 0.
-        correct = 0
+        # correct = 0
         net.train()
 
         for img, label in tqdm(TrainDataloader):
             count += 1
             img = img.cuda()
             label = label.cuda()
-            if cutmix_enabled:
-                img, label = cutmix_fn(img, label)
             scores = net(img)
             loss = criteria(scores, label.float())
             
-            scores = torch.sigmoid(scores)
-            predict = torch.zeros_like(scores)
-            predict[scores > 0.5] = 1
-            predict[scores < 0.5] = 0
-            for k in range(len(predict)):
-                if torch.equal(predict[k], label[k]):
-                    correct += 1
+            # scores = torch.sigmoid(scores)
+            # predict = torch.zeros_like(scores)
+            # predict[scores > 0.5] = 1
+            # predict[scores < 0.5] = 0
+            # for k in range(len(predict)):
+                # if torch.equal(predict[k], label[k]):
+                    # correct += 1
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
         
         train_loss = running_loss / count
-        train_acc = correct / (count * batch_size)
-        accuracy_t.append(train_acc)
+        # train_acc = correct / (count * batch_size)
+        # accuracy_t.append(train_acc)
         loss_t.append(train_loss)
 
+        valid_iou = 0
         if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
             if useresnet:
                 net_cam = network.wideResNet_cam()
@@ -274,7 +231,7 @@ if __name__ == '__main__':
                 best_val = valid_iou
                 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_best.pth")
         
-            print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Valid mIOU: {valid_iou:.4f}')
+        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}')
 
         if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
             torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
@@ -289,21 +246,21 @@ if __name__ == '__main__':
     plt.savefig('./result/train_loss.png')
     plt.close()
 
-    plt.figure(2)
-    plt.plot(accuracy_t)
-    plt.ylabel('accuracy')
-    plt.xlabel('epochs')
-    plt.title('train accuracy')
-    plt.savefig('./result/train_accuracy.png')
+    # plt.figure(2)
+    # plt.plot(accuracy_t)
+    # plt.ylabel('accuracy')
+    # plt.xlabel('epochs')
+    # plt.title('train accuracy')
+    # plt.savefig('./result/train_accuracy.png')
 
-    plt.figure(3)
+    plt.figure(2)
     plt.plot(iou_v)
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
 
-    reporter['training_accuracy'] = accuracy_t
+    # reporter['training_accuracy'] = accuracy_t
     reporter['best_validation_mIOU'] = best_val
 
     with open('result/experiment.json', 'a') as fp:
