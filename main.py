@@ -86,9 +86,9 @@ if __name__ == '__main__':
         os.mkdir(validation_cam_folder_name)
 
     # can be commented once the crop is done in later trainings
-    print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
-    print('cropping finishes!')
+    # print('crop validation set images ...')
+    # crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    # print('cropping finishes!')
 
     # this part is for test the effectiveness of the class activation map
     if testonly:

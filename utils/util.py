@@ -8,6 +8,10 @@ from collections import Counter
 from os.path import join as osp
 from tqdm import tqdm
 from cv2 import imread
+import cv2
+import copy
+from skimage.filters import threshold_otsu
+from skimage.measure import label, regionprops
 
 def convertinttoonehot(nums_list: torch.tensor):
     dic = {0: [1, 0, 0], 1: [0, 1, 0], 2: [0, 0, 1]}
@@ -250,3 +254,45 @@ def crop_validation_images(dataset_path, side_length, stride, scales, validation
                 os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}')
             for j in range(len(scaled_im_list[i])):
                 scaled_im_list[i][j].save(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}/{scaled_position_list[i][j]}.png')
+
+def predict_mask(image, threshold, minimal_size):
+    """
+    given the rgb image, get the foreground mask
+
+    Args:
+        image (PIL.image): the 
+        threshold (int): (0, 255) the threshold for image in hsv format's Value channel
+        minimal_size (int): the parts smaller than minimal_sized will be removed
+
+    Returns:
+        np.ndarray: the predicted mask, same shape as `image`, 0 is background, 1 is foreground 
+    """
+    # threshold
+    image_t = np.asarray(image)
+    temp = cv2.cvtColor(image_t, cv2.COLOR_RGB2HSV)
+    threshold_saturation = threshold_otsu(temp[:,:,1])
+    image_t[temp[:,:,1] < threshold_saturation] = [255, 255, 255]
+    image_t[temp[:,:,1] >= threshold_saturation] = [0, 0, 0]
+    image_t[temp[:,:,2] > threshold] = [255, 255, 255]
+    image_t[temp[:,:,2] <= threshold] = [0, 0, 0]
+
+    # erode
+    erosion_size = 0
+    erosion_shape = 2
+    element = cv2.getStructuringElement(erosion_shape, (2 * erosion_size + 1, 2 * erosion_size + 1), (erosion_size, erosion_size))
+    image_e = cv2.erode(image_t, element)
+
+    # connected components filtering
+    image_c = copy.deepcopy(image_e)
+    temp = cv2.cvtColor(image_e, cv2.COLOR_RGB2GRAY)
+    temp[temp == 0] = 2  # prevent recognizing 0 as background
+    label_image = label(temp)
+    for region in regionprops(label_image):
+        # take regions with large enough areas
+        if region.area <= minimal_size:
+            image_c[label_image == region.label] = [255, 255, 255] - image_c[label_image == region.label]
+
+    # save the predict mask
+    result = image_c[:, :, 1].astype(np.uint8)
+    result[result == 255] = 1
+    return result
