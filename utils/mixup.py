@@ -19,6 +19,7 @@ What it does:
 """
 import numpy as np
 import torch
+import math
 
 
 def one_hot(x, num_classes, on_value=1., off_value=0., device='cuda'):
@@ -225,19 +226,32 @@ class Mixup:
         return lam
 
     def _mix_single(self, x, y):
-        lam_batch, use_cutmix = self._params_per_elem(1)
-        lam = lam_batch[0]
-        if lam != 1.:
-            (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
-                [x.shape[0], min(x.shape[1], y.shape[1]), min(x.shape[2], y.shape[2])], lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
-            x[:, yl:yh, xl:xh] = y[:, yl:yh, xl:xh]
+        (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
+            [x.shape[0], min(x.shape[1], y.shape[1]), min(x.shape[2], y.shape[2])], 1, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
+        width = xh - xl
+        height = yh - yl
+        patch_length = 16
+        threshold = 0.7
+        patch_width = width // patch_length
+        patch_height = height // patch_length
 
-        return
+        count = 0
+        for i in range(patch_height):
+            for j in range(patch_width):
+                if np.random.rand() < threshold:
+                    count += 1
+                    x[:, yl + patch_length*i :yl + patch_length*(i+1), xl + patch_length*j : xl + patch_length*(j+1)] = y[:, yl + patch_length*i :yl + patch_length*(i+1), xl + patch_length*j : xl + patch_length*(j+1)]
+                    # x[:, yl + patch_length*i :yl + patch_length*(i+1), xl + patch_length*j : xl + patch_length*(j+1)] = torch.tensor([0,0,0])[:, None, None]
+        # x[:, yl:yh, xl:xh] = y[:, yl:yh, xl:xh]
+        ratioy = patch_length * patch_length * count / (x.shape[1] * x.shape[2])
+        ratiox = 1 - ratioy
+
+        return ratiox, ratioy
 
     def __call__(self, x, y, target):
         if self.mode == 'single':
-            self._mix_single(x, y)
-            return x
+            ratiox, ratioy = self._mix_single(x, y)
+            return x, ratiox, ratioy
 
         assert len(x) % 2 == 0, 'Batch size should be even when using this'
         if self.mode == 'elem':

@@ -18,8 +18,8 @@ def visualize_result(model_name):
     gt_path = 'Dataset/2.validation/mask'
     mask_path = 'Dataset/2.validation/background-mask'
 
-    if not os.path.exists(f'temp'):
-        os.mkdir(f'temp')
+    if not os.path.exists(f'temp2'):
+        os.mkdir(f'temp2')
 
     visualize_pick = np.arange(40) # define the id of images that require visualization
     
@@ -43,6 +43,29 @@ def visualize_result(model_name):
         with open(f'temp/{i:02d}.png', 'wb') as f:
             w = png.Writer(cam.shape[1], cam.shape[0],palette=palette, bitdepth=8)
             w.write(f, cam)
+
+        cam_path2 = 'valid_out_cam/resnet_newnorm_last'
+        cam2 = np.load(os.path.join(cam_path2, f'{i:02d}.npy'), allow_pickle=True).astype(np.uint8)
+        cam2[mask == 1] = 3
+        with open(f'temp2/{i:02d}.png', 'wb') as f:
+            w = png.Writer(cam2.shape[1], cam2.shape[0],palette=palette, bitdepth=8)
+            w.write(f, cam2)
+        
+
+        plt.figure(i, figsize=(40, 40))
+        im = plt.imread(f'temp/{i:02d}.png')
+        gt = plt.imread(gt_path + f'/{i:02d}.png')
+        prediction2 = plt.imread(f'temp2/{i:02d}.png')
+        plt.subplot(221)
+        plt.imshow(im)
+        plt.title('prediction of cutmix')
+        plt.subplot(222)
+        plt.imshow(prediction2)
+        plt.title('prediction of baseline')
+        plt.subplot(223)
+        plt.imshow(gt)
+        plt.title('groundtruth')
+        plt.savefig(f'temp/{i:02d}.png')
 
         # plt.figure(i)
         # im = plt.imread(f'temp/{i:02d}.png')

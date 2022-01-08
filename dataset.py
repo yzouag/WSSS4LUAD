@@ -45,31 +45,39 @@ class OriginPatchesDataset(Dataset):
         image_path = os.path.join(self.path, self.files[idx])
         im = Image.open(image_path)
         label = get_file_label(filename=self.files[idx])
+        area = None
         if self.cutmix_fn and label.sum() == 1:
             # choose a single label category based on the current distribution
-            relative_labels = find_relative_label(tuple(label))
-            current_numbers = np.array([(1/self.statedic[relative_labels[0]]), (1/self.statedic[relative_labels[1]]), (1/self.statedic[relative_labels[2]])])
-            current_probability = [(current_numbers[0])/current_numbers.sum(), (current_numbers[1])/current_numbers.sum(), (current_numbers[2])/current_numbers.sum()]
-            activate = np.random.choice([0, 1, 2], p=current_probability)
+            # relative_labels = find_relative_label(tuple(label))
+            # current_numbers = np.array([(1/self.statedic[relative_labels[0]]), (1/self.statedic[relative_labels[1]]), (1/self.statedic[relative_labels[2]])])
+            # current_probability = [(current_numbers[0])/current_numbers.sum(), (current_numbers[1])/current_numbers.sum(), (current_numbers[2])/current_numbers.sum()]
+            activate = np.random.randint(3)
             mixcategory = np.array((0, 0, 0))
             mixcategory[activate] = 1
             mixcategory = tuple(mixcategory)
             # randomly select a image in that category
-            activate = np.random.randint(len(self.filedic[mixcategory]))
-            miximage = Image.open(os.path.join(self.path, self.filedic[mixcategory][activate]))
-            im = transforms.ToTensor()(im)
-            miximage = transforms.ToTensor()(miximage)
-            im = self.cutmix_fn(im, miximage, label)
-            label = np.logical_or(label, np.array(mixcategory)).astype(np.int32)
-            self.statedic[tuple(label)] += 1
+            if mixcategory != tuple(label):
+                pick = np.random.randint(len(self.filedic[mixcategory]))
+                miximage = Image.open(os.path.join(self.path, self.filedic[mixcategory][pick]))
+                im = transforms.ToTensor()(im)
+                miximage = transforms.ToTensor()(miximage)
+                im, ratiox, ratioy = self.cutmix_fn(im, miximage, label)
+                area = label.astype(np.float32) * ratiox
+                area[activate] = ratioy
+                label = np.logical_or(label, np.array(mixcategory)).astype(np.int32)
+            else:
+                im = transforms.ToTensor()(im)
+                area = label.astype(np.float32)
+            # self.statedic[tuple(label)] += 1
         else:
             im = transforms.ToTensor()(im)
-            self.statedic[tuple(label)] += 1
+            area = np.array((-1., -1., -1.)).astype(np.float32)
+            # self.statedic[tuple(label)] += 1
 
         if self.transform:
             im = self.transform(im)
         
-        return im, label
+        return im, label, area
 
 class ValidationDataset(Dataset):
     def __init__(self, data_path_name = "Dataset/2.validation/img", transform=None):
