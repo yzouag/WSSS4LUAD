@@ -202,7 +202,7 @@ if __name__ == '__main__':
                 regression_loss = 0.
                 for index in torch.where(w!=0)[0]:
                     regression_loss += regression_criteria(predarea[index][None, :], area[index][None, :])
-                regression_loss / len(torch.where(w!=0)[0])
+                regression_loss = regression_loss / len(torch.where(w!=0)[0])
 
                 loss = criteria(scores, label.float()) + 0.5 * regression_loss
             
