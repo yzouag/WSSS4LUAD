@@ -34,8 +34,8 @@ for the training set, the average size of images is (224, 224).
 
 - resolution of the patches is 224 × 224
 - batch size is set to 20
-- training epochs is set to 20
-- data augmentation: random horizontal and vertical flip with the probability 0.5. 
+- training epochs is set to 36
+- data augmentation: random resized scale (0.5, 1), cutmix (working), rand_augment(?)
 - learning rate of 1e − 2 with a polynomial decay policy
 
 #### segmentation phase
@@ -47,22 +47,22 @@ for the training set, the average size of images is (224, 224).
 
 ### 3.dataloader: [`dataset.py` (TrainSet, TestSet) ]
 
-1. train dataset: use original pathes without further sub crop
-2. train crop: add random resized crop (scale set to (0.25,1), defualt is (0.08, 1))
-3. train augmentation: random augmentation for pathology
-4. multi-scale test dataset: online crop for test, resize for multiple times firstly (eg, 0.5, 0.75, 1, 1.5, 2), then crop each reiszed image with stride (crop size same to train crop size)
+1. train dataset: use original pathes without further sub crop (**Effective, Done**)
+2. train crop: add random resized crop (scale set to (0.5,1), defualt is (0.08, 1)) (**Done**)
+3. train augmentation: random augmentation for pathology (?)
+4. multi-scale test dataset: online crop for test, resize for multiple times firstly (eg, 0.5, 0.75, 1, 1.5, 2), then crop each reiszed image with stride (crop size same to train crop size) (**Effective, Done**)
 
 ### 4.test and eval: [`test.py`, `eval.py`]
-1. test with multi-scale test
-2. use x^y for the normal channel (1 - pos.max()) to control the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt
+1. test with multi-scale test (**Done**)
+2. use x^y for the normal channel (1 - pos.max()) to control the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt (**Not Required, No need distinguishing foreground**)
 
 ### 5.improvements: (`train.py`)
-1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174]
-2. large model: resnest269
-3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5)
-4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced)
-5. generate pseudo mask without model for single label patches (require corrosion and smoothing )
-6. activation drop out: randomly drop high activation
+1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174] (**Effective, Done**)
+2. large model: resnest269 (**In Progress**)
+3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5) (**Not, Required, Using CutMix**)
+4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced) (**In progress**)
+5. generate pseudo mask without model for single label patches (require corrosion and smoothing ) (**In Progress**)
+6. activation drop out: randomly drop high activation (**Testing, Done**)
 7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area)
 8. diff loss weights for single-label / multi-label / mixed label
 9. contrastive loss (reduce cosine distance for same category and enlarge it for the different, top2 loss_conl)

@@ -117,13 +117,15 @@ class Normalize():
         return proc_img
 
 class wideResNet(nn.Module):
-    def __init__(self, adl_drop_rate=None, adl_threshold=None):
+    def __init__(self, adl_drop_rate=None, adl_threshold=None, regression_activate=False):
         super(wideResNet, self).__init__()
 
         # add attention dropout layers
         self.adl_drop_rate = adl_drop_rate
         self.adl_threshold = adl_threshold
-        self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
+        self.regression_activate = regression_activate
+        if adl_drop_rate is not None:
+            self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
 
         self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 
@@ -148,6 +150,7 @@ class wideResNet(nn.Module):
 
         self.b6 = ResBlock_bot(1024, 2048, stride=1, dilation=4, dropout=0.3)
 
+        # self.b7 = ResBlock_bot(2048, 4096, dilation=2)
         self.b7 = ResBlock_bot(2048, 4096, dilation=2, dropout=0.5)
 
         self.bn7 = nn.BatchNorm2d(4096)
@@ -159,6 +162,10 @@ class wideResNet(nn.Module):
 
         self.fc1 = nn.Linear(5632, 3)
 
+        if self.regression_activate:
+            self.fcregression = nn.Linear(5632, 3)
+            self.soft = nn.Softmax(dim=0)
+
         return
 
     def forward(self, x):
@@ -169,11 +176,15 @@ class wideResNet(nn.Module):
         x = self.b2_1(x)
         x = self.b2_2(x)
 
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
         x = self.b3(x)
         x = self.b3_1(x)
         x = self.b3_2(x)
 
         #x = self.b4(x)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
         x, conv3 = self.b4(x, get_x_bn_relu=True)
         x = self.b4_1(x)
         x = self.b4_2(x)
@@ -188,17 +199,22 @@ class wideResNet(nn.Module):
         x = self.b5_2(x)
 
         x, conv5 = self.b6(x, get_x_bn_relu=True)
-
-        x = self.b7(x)
+        
         if self.adl_drop_rate is not None:
             x = self.adl(x)
+        x = self.b7(x)
+
         conv6 = F.relu(self.bn7(x))
         result = torch.cat([conv4, conv5, conv6], dim=1)
         result = self.pool(result)
         result = torch.flatten(result, start_dim=1)
-        result = self.fc1(result)
+        classification_result = self.fc1(result)
+        if self.regression_activate:
+            regression_result = self.fcregression(result)
+            regression_result = self.soft(regression_result)
+            return classification_result, regression_result
 
-        return result
+        return classification_result
 
 
     def train(self, mode=True):
