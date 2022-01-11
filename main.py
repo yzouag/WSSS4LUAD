@@ -1,4 +1,3 @@
-import json
 import argparse
 import torch
 from tqdm import tqdm
@@ -9,8 +8,7 @@ import network
 import dataset
 from torch.utils.data import DataLoader
 from utils.metric import get_overall_valid_score
-from utils.generate_CAM import generate_cam
-from utils.util import crop_validation_images, get_average_image_size, report
+from utils.generate_CAM import generate_validation_cam
 from utils.mixup import Mixup
 from timm.data.auto_augment import rand_augment_transform
 
@@ -45,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
     parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
-    parser.add_argument("-test_every", default=10, type=int, help="how often to test a model while training")
+    parser.add_argument("-test_every", default=5, type=int, help="how often to test a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
@@ -57,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
     parser.add_argument("-reg", action='store_true', default=False, help="whether to use the area regression")
+    parser.add_argument('-dataset', default='warwick', type=str, choices=['warwick', 'wsss'], help='now only support two types: (warwick, wsss)')
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -76,6 +75,7 @@ if __name__ == '__main__':
     adl_drop_rate = args.adl_drop_rate
     rand_aug = args.randaug
     activate_regression = args.reg
+    target_dataset = args.dataset
     if cutmix_alpha == 0:
         activate_regression = False
 
@@ -85,16 +85,12 @@ if __name__ == '__main__':
         os.mkdir('val_image_label')
     if not os.path.exists('result'):
         os.mkdir('result')
-    validation_cam_folder_name = 'valid_out_cam'
-    validation_dataset_path = 'Dataset/2.validation/img'
+    
+    validation_cam_folder_name = f'{target_dataset}_valid_out_cam'
+    validation_dataset_path = f'Dataset_{target_dataset}/2.validation/img'
     scales = [1, 1.25, 1.5, 1.75, 2]
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
-
-    # can be commented once the crop is done in later trainings
-    # print('crop validation set images ...')
-    # crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
-    # print('cropping finishes!')
 
     # this part is for test the effectiveness of the class activation map
     if testonly:
@@ -117,8 +113,8 @@ if __name__ == '__main__':
         print("successfully load model states.")
         
         # calculate MIOU
-        generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
-        valid_image_path = f'valid_out_cam/{ckpt}'
+        generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+        valid_image_path = f'{target_dataset}_valid_out_cam/{ckpt}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         print(f"test mIOU score is: {valid_iou}")
         exit()
@@ -130,11 +126,9 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
             print("Original Network used.")
             net = network.wideResNet(regression_activate=activate_regression)
-            # print(net.state_dict().keys())
         else:
             print("adl network used!")
             net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
@@ -142,7 +136,6 @@ if __name__ == '__main__':
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -169,7 +162,6 @@ if __name__ == '__main__':
             # transforms.ToTensor(),
             transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
         ])
-    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     #cutmix init
     if cutmix_alpha == 0:
@@ -183,10 +175,10 @@ if __name__ == '__main__':
                         num_classes=3)
 
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(transform=train_transform, cutmix_fn=cutmix_fn)
+    TrainDataset = dataset.OriginPatchesDataset(data_path_name='Dataset_warwick/1.training/img', transform=train_transform, cutmix_fn=cutmix_fn)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
-    TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=2, sampler=TrainDatasampler, drop_last=True)
+    TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=4, sampler=TrainDatasampler, drop_last=True)
 
     # optimizer and loss
     optimizer = PolyOptimizer(net.parameters(), base_lr, weight_decay=1e-4, max_step=epochs, momentum=0.9)
@@ -251,9 +243,13 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            generate_cam(net_cam, (224, int(224//3)), batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
-            valid_image_path = f'{validation_cam_folder_name}/{model_name}'
-            valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
+            valid_image_path = os.path.join(validation_cam_folder_name, model_name)
+            if target_dataset == 'wsss':
+                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask')
+            elif target_dataset == 'warwick':
+                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8)
             iou_v.append(valid_iou)
             
             if valid_iou > best_val:
@@ -290,8 +286,3 @@ if __name__ == '__main__':
     plt.xlabel('epochs')
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
-
-    reporter['best_validation_mIOU'] = best_val
-
-    # with open('result/experiment.json', 'a') as fp:
-    #     json.dump(reporter, fp)

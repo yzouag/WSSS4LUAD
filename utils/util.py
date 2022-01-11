@@ -240,20 +240,20 @@ def crop_validation_images(dataset_path, side_length, stride, scales, validation
         scales (list): a list of scales to crop
         validation_cam_folder_name (str): the destination to store the validation cam
     """
-    png_images = os.listdir(dataset_path)
+    images = os.listdir(dataset_path)
     if not os.path.exists(f'{validation_cam_folder_name}/crop_images'):
         os.mkdir(f'{validation_cam_folder_name}/crop_images')
-    for png_image in png_images:
-        if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}'):
-            os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}')
-        image_path = os.path.join(dataset_path, png_image)
+    for image in tqdm(images):
+        if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{image.split(".")[0]}'):
+            os.mkdir(f'{validation_cam_folder_name}/crop_images/{image.split(".")[0]}')
+        image_path = os.path.join(dataset_path, image)
         im = np.asarray(Image.open(image_path))
         scaled_im_list, scaled_position_list = multiscale_online_crop(im, side_length, stride, scales)
         for i in range(len(scales)):
-            if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}'):
-                os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}')
+            if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{image.split(".")[0]}/{scales[i]}'):
+                os.mkdir(f'{validation_cam_folder_name}/crop_images/{image.split(".")[0]}/{scales[i]}')
             for j in range(len(scaled_im_list[i])):
-                scaled_im_list[i][j].save(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}/{scales[i]}/{scaled_position_list[i][j]}.png')
+                scaled_im_list[i][j].save(f'{validation_cam_folder_name}/crop_images/{image.split(".")[0]}/{scales[i]}/{scaled_position_list[i][j]}.png')
 
 def predict_mask(image, threshold, minimal_size):
     """

@@ -18,7 +18,7 @@ def find_relative_label(label):
     return label_dic[label]
 
 class OriginPatchesDataset(Dataset):
-    def __init__(self, data_path_name = "Dataset/1.training", transform=None, cutmix_fn=None):
+    def __init__(self, data_path_name = "Dataset_wsss/1.training", transform=None, cutmix_fn=None):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
@@ -38,8 +38,8 @@ class OriginPatchesDataset(Dataset):
         self.statedic[tuple((0, 1, 1))] = 1
 
     def __len__(self):
-        return len(self.files)
-        # return 50
+        # return len(self.files)
+        return 50
 
     def __getitem__(self, idx):
         image_path = os.path.join(self.path, self.files[idx])
