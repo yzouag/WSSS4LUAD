@@ -41,21 +41,22 @@ class PolyOptimizer(torch.optim.SGD):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-batch", default=20, type=int)
-    parser.add_argument("-epoch", default=36, type=int)
+    parser.add_argument("-epoch", default=20, type=int)
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
     parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
-    parser.add_argument("-test_every", default=5, type=int, help="how often to test a model while training")
+    parser.add_argument("-test_every", default=10, type=int, help="how often to test a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
-    parser.add_argument("--cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
+    parser.add_argument("-cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
     parser.add_argument("-adl_threshold", type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
     parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
+    parser.add_argument("-reg", action='store_true', default=False, help="whether to use the area regression")
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -74,6 +75,9 @@ if __name__ == '__main__':
     adl_threshold = args.adl_threshold
     adl_drop_rate = args.adl_drop_rate
     rand_aug = args.randaug
+    activate_regression = args.reg
+    if cutmix_alpha == 0:
+        activate_regression = False
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
@@ -129,9 +133,11 @@ if __name__ == '__main__':
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
             print("Original Network used.")
-            net = network.wideResNet()
+            net = network.wideResNet(regression_activate=activate_regression)
+            # print(net.state_dict().keys())
         else:
-            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold)
+            print("adl network used!")
+            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
@@ -152,7 +158,7 @@ if __name__ == '__main__':
             transforms.RandomResizedCrop(size=resize, scale=scale),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            transforms.ToTensor(),
+            # transforms.ToTensor(),
             transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
         ])
     else:
@@ -160,7 +166,7 @@ if __name__ == '__main__':
             transforms.RandomResizedCrop(size=resize, scale=scale),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            transforms.ToTensor(),
+            # transforms.ToTensor(),
             transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
         ])
     reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
@@ -172,7 +178,7 @@ if __name__ == '__main__':
     else:
         print("cutmix enabled!")
         cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
-                        cutmix_minmax=[0.25, 0.75], prob=1, switch_prob=0, 
+                        cutmix_minmax=[0.4, 0.8], prob=1, switch_prob=0, 
                         mode="single", correct_lam=True, label_smoothing=0.0,
                         num_classes=3)
 
@@ -184,43 +190,48 @@ if __name__ == '__main__':
 
     # optimizer and loss
     optimizer = PolyOptimizer(net.parameters(), base_lr, weight_decay=1e-4, max_step=epochs, momentum=0.9)
-    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
+    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean') # pos_weight=torch.tensor([0.73062968, 0.65306307, 2.11971588])
+    regression_criteria = torch.nn.MSELoss(reduction='mean').cuda()
     criteria.cuda()
 
     # train loop
     loss_t = []
-    # accuracy_t = []
     iou_v = []
     best_val = 0
     
     for i in range(epochs):
         count = 0
         running_loss = 0.
-        # correct = 0
         net.train()
 
-        for img, label in tqdm(TrainDataloader):
+        for img, label, area in tqdm(TrainDataloader):
             count += 1
             img = img.cuda()
             label = label.cuda()
-            scores = net(img)
-            loss = criteria(scores, label.float())
+
+            if activate_regression:
+                area = area.cuda()
+                scores, predarea = net(img)
+                w = torch.sum(area, dim=1)
+                w[w < 0] = 0
+
+                regression_loss = 0.
+                for index in torch.where(w!=0)[0]:
+                    regression_loss += regression_criteria(predarea[index][None, :], area[index][None, :])
+                regression_loss = regression_loss / len(torch.where(w!=0)[0])
+
+                loss = criteria(scores, label.float()) + 0.5 * regression_loss
             
-            # scores = torch.sigmoid(scores)
-            # predict = torch.zeros_like(scores)
-            # predict[scores > 0.5] = 1
-            # predict[scores < 0.5] = 0
-            # for k in range(len(predict)):
-                # if torch.equal(predict[k], label[k]):
-                    # correct += 1
+            else:
+                scores = net(img)
+                loss = criteria(scores, label.float())
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
         
         train_loss = running_loss / count
-        # train_acc = correct / (count * batch_size)
-        # accuracy_t.append(train_acc)
         loss_t.append(train_loss)
 
         valid_iou = 0
@@ -233,7 +244,9 @@ if __name__ == '__main__':
             pretrained = net.state_dict()
             pretrained = {k[7:]: v for k, v in pretrained.items()}
             pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
-            # pretrained['fc2.weight'] = pretrained['fc2.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
+            if 'fcregression.weight' in pretrained: 
+                del pretrained['fcregression.weight']
+                del pretrained['fcregression.bias']
             net_cam.load_state_dict(pretrained)
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
@@ -264,21 +277,21 @@ if __name__ == '__main__':
     plt.close()
 
     # plt.figure(2)
-    # plt.plot(accuracy_t)
-    # plt.ylabel('accuracy')
-    # plt.xlabel('epochs')
-    # plt.title('train accuracy')
-    # plt.savefig('./result/train_accuracy.png')
+    # plt.plot(regression_loss_track, label="reg loss")
+    # plt.legend()
+    # plt.ylabel('loss value')
+    # plt.xlabel('batchs*5')
+    # plt.title('loss')
+    # plt.savefig('./result/loss_trackadl.png')
 
-    plt.figure(2)
+    plt.figure(3)
     plt.plot(iou_v)
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
 
-    # reporter['training_accuracy'] = accuracy_t
     reporter['best_validation_mIOU'] = best_val
 
-    with open('result/experiment.json', 'a') as fp:
-        json.dump(reporter, fp)
+    # with open('result/experiment.json', 'a') as fp:
+    #     json.dump(reporter, fp)
