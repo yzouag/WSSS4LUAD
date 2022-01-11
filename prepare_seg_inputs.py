@@ -6,12 +6,12 @@ import numpy as np
 from scipy.stats.stats import mode
 import torch
 from torch.utils.data.dataloader import DataLoader
-
 from torchvision import transforms
 from tqdm import tqdm
 import torch.nn.functional as F
 from dataset import TrainingSetCAM
 import network
+from utils.util import predict_mask
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -62,6 +62,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for im_name, scaled_im_list, scaled_position_list, scales, big_label in tqdm(dataLoader):
+            big_label = big_label[0]
             orig_img = np.asarray(Image.open(f'{train_dataset_path}/{im_name[0]}'))
             w, h, _ = orig_img.shape
 
@@ -128,6 +129,10 @@ if __name__ == '__main__':
                             
                 result_label = ensemble_cam.argmax(axis=0)
             
+            result_label = result_label + 1
+            predicted_background_mask = predict_mask(Image.open(f'{train_dataset_path}/{im_name[0]}'), 230, 50)
+            result_label = predicted_background_mask * result_label
+
             if not os.path.exists(f'{train_pseudo_mask_path}'):
                 os.mkdir(f'{train_pseudo_mask_path}')
             np.save(f'{train_pseudo_mask_path}/{im_name[0][:-4]}.npy', result_label)

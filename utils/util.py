@@ -294,5 +294,6 @@ def predict_mask(image, threshold, minimal_size):
 
     # save the predict mask
     result = image_c[:, :, 1].astype(np.uint8)
-    result[result == 255] = 1
+    result[result == 0] = 1
+    result[result == 255] = 0
     return result
