@@ -63,7 +63,7 @@ def get_overall_valid_score(
     Returns:
         float: the mIOU score
     """
-    image_names = map(lambda x: x.split('.')[0], os.listdir(pred_image_path))
+    image_names = list(map(lambda x: x.split('.')[0], os.listdir(pred_image_path)))
     random.shuffle(image_names)
     image_list = chunks(image_names, num_workers)
 

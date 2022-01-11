@@ -117,7 +117,7 @@ class Normalize():
         return proc_img
 
 class wideResNet(nn.Module):
-    def __init__(self, adl_drop_rate=None, adl_threshold=None, regression_activate=False):
+    def __init__(self, num_class=3, adl_drop_rate=None, adl_threshold=None, regression_activate=False):
         super(wideResNet, self).__init__()
 
         # add attention dropout layers
@@ -160,10 +160,10 @@ class wideResNet(nn.Module):
         self.normalize = Normalize()
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.fc1 = nn.Linear(5632, 3)
+        self.fc1 = nn.Linear(5632, num_class)
 
         if self.regression_activate:
-            self.fcregression = nn.Linear(5632, 3)
+            self.fcregression = nn.Linear(5632, num_class)
             self.soft = nn.Softmax(dim=0)
 
         return

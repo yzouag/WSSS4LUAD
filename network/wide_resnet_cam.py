@@ -117,7 +117,7 @@ class Normalize():
         return proc_img
 
 class wideResNet_cam(nn.Module):
-    def __init__(self):
+    def __init__(self, num_class=3):
         super(wideResNet_cam, self).__init__()
 
         self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
@@ -151,7 +151,7 @@ class wideResNet_cam(nn.Module):
 
         self.normalize = Normalize()
 
-        self.fc1 = torch.nn.Conv2d(5632, 3, 1, stride=1, padding=0, bias=True)
+        self.fc1 = torch.nn.Conv2d(5632, num_class, 1, stride=1, padding=0, bias=True)
 
         return
 
