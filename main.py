@@ -12,7 +12,7 @@ from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_cam
 from utils.util import crop_validation_images, get_average_image_size, report
 from utils.mixup import Mixup
-
+from timm.data.auto_augment import rand_augment_transform
 
 class PolyOptimizer(torch.optim.SGD):
     def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
@@ -55,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument("--cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
     parser.add_argument("-adl_threshold", type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
     parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
+    parser.add_argument('-randaug', action='store_true', default=False)
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -72,6 +73,7 @@ if __name__ == '__main__':
     cutmix_alpha = args.cutmix
     adl_threshold = args.adl_threshold
     adl_drop_rate = args.adl_drop_rate
+    rand_aug = args.randaug
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
@@ -138,14 +140,29 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
+    if rand_aug:
+        tfm = rand_augment_transform(
+            config_str='rand-m9-n3-mstd0.5', 
+            hparams={'translate_const': 60, 'img_mean': (124, 116, 104)}
+        )
     scale = (0.5, 1)
-    train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=resize, scale=scale),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        # transforms.ToTensor(),
-        transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
-    ])
+    if rand_aug:
+        train_transform = transforms.Compose([
+            tfm,
+            transforms.RandomResizedCrop(size=resize, scale=scale),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+        ])
+    else:
+        train_transform = transforms.Compose([
+            transforms.RandomResizedCrop(size=resize, scale=scale),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+        ])
     reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     #cutmix init

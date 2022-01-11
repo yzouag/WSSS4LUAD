@@ -176,23 +176,25 @@ class wideResNet(nn.Module):
 
         #x = self.b4(x)
         x, conv3 = self.b4(x, get_x_bn_relu=True)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
         x = self.b4_1(x)
         x = self.b4_2(x)
         x = self.b4_3(x)
         x = self.b4_4(x)
         x = self.b4_5(x)
-        if self.adl_drop_rate is not None:
-            x = self.adl(x)
 
         x, conv4 = self.b5(x, get_x_bn_relu=True)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
         x = self.b5_1(x)
         x = self.b5_2(x)
 
         x, conv5 = self.b6(x, get_x_bn_relu=True)
-
-        x = self.b7(x)
         if self.adl_drop_rate is not None:
             x = self.adl(x)
+
+        x = self.b7(x)
         conv6 = F.relu(self.bn7(x))
         result = torch.cat([conv4, conv5, conv6], dim=1)
         result = self.pool(result)

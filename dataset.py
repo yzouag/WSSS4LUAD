@@ -62,9 +62,9 @@ class OriginPatchesDataset(Dataset):
             im = self.cutmix_fn(im, miximage, label)
             label = np.logical_or(label, np.array(mixcategory)).astype(np.int32)
             self.statedic[tuple(label)] += 1
-        else:
-            im = transforms.ToTensor()(im)
-            self.statedic[tuple(label)] += 1
+        # else:
+            # im = transforms.ToTensor()(im)
+            # self.statedic[tuple(label)] += 1
 
         if self.transform:
             im = self.transform(im)
