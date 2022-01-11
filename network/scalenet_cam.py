@@ -74,7 +74,7 @@ class SABlock(nn.Module):
 
 class ScaleNetCAM(nn.Module):
 
-    def __init__(self, block, layers, structure, dilations=(1,1,2,4)):
+    def __init__(self, block, layers, structure, dilations=(1,1,2,4), num_class=3):
         super(ScaleNetCAM, self).__init__()
 
         self.inplanes = 64
@@ -97,7 +97,7 @@ class ScaleNetCAM(nn.Module):
                 m.bias.data.zero_()
 
         # self.normalize = Normalize()
-        self.fc1 = torch.nn.Conv2d(3584, 3, 1, stride=1, padding=0, bias=True)
+        self.fc1 = torch.nn.Conv2d(3584, num_class, 1, stride=1, padding=0, bias=True)
         # self.fc2 = torch.nn.Conv2d(128, 3, 1, stride=1, padding=0, bias=True)
         self.not_training = []
         block.layer_idx = 0
@@ -167,10 +167,10 @@ def scalenet50(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
     return model
 
 
-def scalenet101_cam(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
+def scalenet101_cam(structure_path, ckpt=None, dilations=(1,1,1,1), num_class=3, **kwargs):
     layer = [3, 4, 23, 3]
     structure = json.loads(open(structure_path).read())
-    model = ScaleNetCAM(SABlock, layer, structure, dilations, **kwargs)
+    model = ScaleNetCAM(SABlock, layer, structure, dilations, num_class, **kwargs)
 
     # pretrained
     if ckpt != None:
@@ -180,10 +180,10 @@ def scalenet101_cam(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
     return model
 
 
-def scalenet152_cam(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
+def scalenet152_cam(structure_path, ckpt=None, dilations=(1,1,1,1), num_class=3, **kwargs):
     layer = [3, 8, 36, 3]
     structure = json.loads(open(structure_path).read())
-    model = ScaleNetCAM(SABlock, layer, structure, dilations, **kwargs)
+    model = ScaleNetCAM(SABlock, layer, structure, dilations, num_class, **kwargs)
 
     # pretrained
     if ckpt != None:

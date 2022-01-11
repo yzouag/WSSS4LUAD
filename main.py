@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument("-epoch", default=20, type=int)
     parser.add_argument("-lr", default=0.01, type=float)
     parser.add_argument("-resize", default=224, type=int)
-    parser.add_argument("-save_every", default=0, type=int, help="how often to save a model while training")
+    parser.add_argument("-c", default=3, type=int, help="number of classes")
     parser.add_argument("-test_every", default=10, type=int, help="how often to test a model while training")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     epochs = args.epoch
     base_lr = args.lr
     resize = args.resize
-    save_every = args.save_every
+    num_class = args.c
     test_every = args.test_every
     devices = args.device
     model_name = args.m
@@ -101,9 +101,9 @@ if __name__ == '__main__':
         
         # create cam model
         if useresnet:
-            net_cam = network.wideResNet_cam()
+            net_cam = network.wideResNet_cam(num_class=num_class)
         else:
-            net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+            net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json', num_class=num_class)
             
         model_path = "modelstates/" + ckpt + ".pth"
         pretrained = torch.load(model_path)['model']
@@ -131,16 +131,20 @@ if __name__ == '__main__':
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
         if adl_drop_rate == 0:
             print("Original Network used.")
-            net = network.wideResNet(regression_activate=activate_regression)
+            net = network.wideResNet(regression_activate=activate_regression, num_class=num_class)
             # print(net.state_dict().keys())
         else:
             print("adl network used!")
-            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
+            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression, num_class=num_class)
         net.load_state_dict(torch.load(resnet38_path), strict=False)
     else:
         prefix = "scalenet"
-        net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
-        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
+        if adl_drop_rate == 0:
+            print("Original Network used.")
+            net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, regression_activate=activate_regression)
+        else:
+            print("adl network used!")
+            net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -153,7 +157,7 @@ if __name__ == '__main__':
         # transforms.ToTensor(),
         transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
     ])
-    reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
+    # reporter['data_augmentation'] = {'random_resized_crop': f"scale={scale}"}
 
     #cutmix init
     if cutmix_alpha == 0:
@@ -247,8 +251,8 @@ if __name__ == '__main__':
         
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}')
 
-        if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
+        # if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
+        #     torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
 
     torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_last.pth")
 
@@ -275,7 +279,7 @@ if __name__ == '__main__':
     plt.title('valid accuracy')
     plt.savefig('./result/valid_iou.png')
 
-    reporter['best_validation_mIOU'] = best_val
+    # reporter['best_validation_mIOU'] = best_val
 
     # with open('result/experiment.json', 'a') as fp:
     #     json.dump(reporter, fp)
