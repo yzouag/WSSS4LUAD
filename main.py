@@ -49,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
+    parser.add_argument('-resnest', action='store_true', default=False)
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
@@ -67,6 +68,7 @@ if __name__ == '__main__':
     devices = args.device
     model_name = args.m
     useresnet = args.resnet
+    useresnest = args.resnest
     testonly = args.test
     ckpt = args.ckpt
     remark = args.note
@@ -141,6 +143,14 @@ if __name__ == '__main__':
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth')
         reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
+    
+    if useresnest:
+        prefix = "resneSt"
+        resnest269_path = "weights/resnest269-0cc87c48.pth"
+        net = network.resnest269()
+        net.load_state_dict(torch.load(resnest269_path),strict=False)
+        reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
+
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
     # data augmentation
@@ -224,6 +234,8 @@ if __name__ == '__main__':
                 net_cam = network.wideResNet_cam()
             else:
                 net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+            if useresnest:
+                pass
 
             pretrained = net.state_dict()
             pretrained = {k[7:]: v for k, v in pretrained.items()}

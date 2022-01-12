@@ -244,6 +244,7 @@ def crop_validation_images(dataset_path, side_length, stride, scales, validation
     if not os.path.exists(f'{validation_cam_folder_name}/crop_images'):
         os.mkdir(f'{validation_cam_folder_name}/crop_images')
     for png_image in png_images:
+        print(png_image)
         if not os.path.exists(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}'):
             os.mkdir(f'{validation_cam_folder_name}/crop_images/{png_image[:2]}')
         image_path = os.path.join(dataset_path, png_image)
