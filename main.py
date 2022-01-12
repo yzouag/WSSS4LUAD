@@ -106,6 +106,8 @@ if __name__ == '__main__':
             net_cam = network.wideResNet_cam()
         else:
             net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+        if useresnest:
+            net_cam = network.resnest269_cam()
             
         model_path = "modelstates/" + ckpt + ".pth"
         pretrained = torch.load(model_path)['model']
@@ -235,7 +237,7 @@ if __name__ == '__main__':
             else:
                 net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
             if useresnest:
-                pass
+                net_cam = network.resnest269_cam()
 
             pretrained = net.state_dict()
             pretrained = {k[7:]: v for k, v in pretrained.items()}

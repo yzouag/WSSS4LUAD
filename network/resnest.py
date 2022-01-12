@@ -8,9 +8,9 @@
 """ResNeSt models"""
 
 import torch
-from .resnet import ResNet, Bottleneck
+from .resnet import ResNet, Bottleneck, ResNet_cam
 
-__all__ = ['resnest50', 'resnest101', 'resnest200', 'resnest269']
+__all__ = ['resnest50', 'resnest101', 'resnest200', 'resnest269', 'resnest269_cam']
 
 _url_format = 'https://github.com/zhanghang1989/ResNeSt/releases/download/weights_step1/{}-{}.pth'
 
@@ -62,6 +62,17 @@ resnest_model_urls = {name: _url_format.format(name, short_hash(name)) for
 
 def resnest269(**kwargs):
     model = ResNet(Bottleneck, [3, 30, 48, 8],
+                   radix=2, groups=1, bottleneck_width=64,
+                   deep_stem=True, stem_width=64, avg_down=True,
+                   avd=True, avd_first=False, **kwargs)
+    # if pretrained:
+    #     model.load_state_dict(torch.hub.load_state_dict_from_url(
+    #         resnest_model_urls['resnest269'], progress=True, check_hash=True))
+    return model
+
+
+def resnest269_cam(**kwargs):
+    model = ResNet_cam(Bottleneck, [3, 30, 48, 8],
                    radix=2, groups=1, bottleneck_width=64,
                    deep_stem=True, stem_width=64, avg_down=True,
                    avd=True, avd_first=False, **kwargs)

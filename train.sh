@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1,2,3 python main.py -d 0 1 2 -m resnest269 -resnest -save_every 5

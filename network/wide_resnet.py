@@ -194,7 +194,7 @@ class wideResNet(nn.Module):
         if self.adl_drop_rate is not None:
             x = self.adl(x)
 
-        x, conv4 = self.b5(x, get_x_bn_relu=True)
+        x, conv4 = self.b5(x, get_x_bn_relu=True)   #(10,1024,28,28) (10, 512, 28,28)
         x = self.b5_1(x)
         x = self.b5_2(x)
 
@@ -202,12 +202,12 @@ class wideResNet(nn.Module):
         
         if self.adl_drop_rate is not None:
             x = self.adl(x)
-        x = self.b7(x)
+        x = self.b7(x)  #(10, 2048,28,28) (10, 512, 28,28)
 
-        conv6 = F.relu(self.bn7(x))
+        conv6 = F.relu(self.bn7(x)) #(10, 4096, 28,28)
         result = torch.cat([conv4, conv5, conv6], dim=1)
-        result = self.pool(result)
-        result = torch.flatten(result, start_dim=1)
+        result = self.pool(result)  #(10, 5632, 28,28)
+        result = torch.flatten(result, start_dim=1) #(10, 5632, 1,1)
         classification_result = self.fc1(result)
         if self.regression_activate:
             regression_result = self.fcregression(result)

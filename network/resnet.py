@@ -205,7 +205,7 @@ class ResNet(nn.Module):
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer, is_first=False)
+        self.layer1 = self._make_layer(block, 64, layers[0], stride=1, norm_layer=norm_layer, is_first=False)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
         if dilated or dilation == 4:
             self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
@@ -222,16 +222,16 @@ class ResNet(nn.Module):
                                            dilation=2, norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
         else:
-            self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+            self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
                                            norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
-            self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+            self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
                                            norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
         self.avgpool = GlobalAvgPool2d()
         self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.fc2 = nn.Linear(num_classes, 3)    #hack
+        self.fc1 = nn.Linear(3584, 3)    #hack
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -297,22 +297,31 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv1(x)   #10,3,224,224
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        x = self.maxpool(x) #10, 128, 56, 56
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.layer1(x)  #10, 256, 56, 56
+        x = self.layer2(x)  #10, 512, 28, 28
+        store_a = x         #10, 512, 28, 28
+        x = self.layer3(x)  #10, 1024, 28, 28
+        store_b = x
+        x = self.layer4(x)  #10, 1024, 28, 28
+        store_c = x
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.fc(x)
-        x = self.fc2(x) #hack
+        result = torch.cat([store_a, store_b, store_c], dim=1)  #10, 3584, 28, 28
+        result = self.avgpool(result)   #10, 3584
+        result = torch.flatten(result, 1)
+        result = self.fc1(result)
+        return result
+
+        # x = self.avgpool(x) 
+        # x = torch.flatten(x, 1)
+        # if self.drop:
+        #     x = self.drop(x)
+        # x = self.fc(x)
+        # x = self.fc1(x) #hack   #10, 1000
 
         return x
 
@@ -360,7 +369,7 @@ class ResNet_cam(nn.Module):
         self.avd = avd
         self.avd_first = avd_first
 
-        super(ResNet, self).__init__()
+        super(ResNet_cam, self).__init__()
         self.rectified_conv = rectified_conv
         self.rectify_avg = rectify_avg
         if rectified_conv:
@@ -385,7 +394,7 @@ class ResNet_cam(nn.Module):
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer, is_first=False)
+        self.layer1 = self._make_layer(block, 64, layers[0], stride=1, norm_layer=norm_layer, is_first=False)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
         if dilated or dilation == 4:
             self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
@@ -402,16 +411,16 @@ class ResNet_cam(nn.Module):
                                            dilation=2, norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
         else:
-            self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+            self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
                                            norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
-            self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+            self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
                                            norm_layer=norm_layer,
                                            dropblock_prob=dropblock_prob)
         self.avgpool = GlobalAvgPool2d()
         self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.fc2 = nn.Linear(num_classes, 3)    #hack
+        self.fc1 = nn.Conv2d(3584, 3, 1, stride=1, padding=0, bias=True)    #hack
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -477,23 +486,28 @@ class ResNet_cam(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv1(x)   #10,3,224,224
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.layer1(x)  #10, 128, 56, 56
+        x = self.layer2(x)  #10, 256, 56, 56
+        store_a = x
+        x = self.layer3(x)  #10, 512, 28, 28
+        store_b = x
+        x = self.layer4(x)  #10, 1024, 14, 14
+        store_c = x
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.fc(x)
-        x = self.fc2(x) #hack
-
+        result = torch.cat([store_a, store_b, store_c], dim=1)  #10, 3584, 28, 28
+        result = self.fc1(result)
+        return result
+        # x = self.avgpool(x) #10, 1024, 7, 7
+        # x = torch.flatten(x, 1) #10, 2048
+        # if self.drop:
+        #     x = self.drop(x)
+        # x = self.fc(x)  #10, 2048
+        # x = self.fc1(x) #hack   #10, 1000
         return x
 
 
