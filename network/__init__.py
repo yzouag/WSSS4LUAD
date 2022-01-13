@@ -4,3 +4,4 @@ from .scalenet import scalenet101
 from .scalenet import scalenet152
 from .scalenet_cam import scalenet101_cam
 from .scalenet_cam import scalenet152_cam
+from .resnest import resnest269, resnest269_cam

@@ -207,8 +207,8 @@ class wideResNet(nn.Module):
         x = self.b7(x)
         conv6 = F.relu(self.bn7(x))
         result = torch.cat([conv4, conv5, conv6], dim=1)
-        result = self.pool(result)
-        result = torch.flatten(result, start_dim=1)
+        result = self.pool(result)  #(10, 5632, 28,28)
+        result = torch.flatten(result, start_dim=1) #(10, 5632, 1,1)
         classification_result = self.fc1(result)
         if self.regression_activate:
             regression_result = self.fcregression(result)
