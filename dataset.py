@@ -157,6 +157,7 @@ class TrainingSetCAM(Dataset):
             for im_list in scaled_im_list:
                 for patch_id in range(len(im_list)):
                     im_list[patch_id] = self.transform(im_list[patch_id])
-        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
-
+        name = self.files[idx]
+        label = name[name.find('[')+1:name.find(']')].split(',')
+        label = np.array(list(map(lambda x: int(x), label)))
         return self.files[idx], scaled_im_list, scaled_position_list, self.scales, label

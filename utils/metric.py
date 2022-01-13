@@ -47,9 +47,7 @@ def get_mIOU(mask, groundtruth, prediction):
     return score
 
 
-def get_overall_valid_score(
-    pred_image_path, groundtruth_path, num_workers=5, mask_path=None
-):
+def get_overall_valid_score(pred_image_path, groundtruth_path, num_workers=5, mask_path=None, num_class=3):
     """
     get the scores with validation groundtruth, the background will be masked out
     and return the score for all photos
@@ -59,6 +57,7 @@ def get_overall_valid_score(
         groundtruth_path (str): groundtruth images, png format
         num_workers (int): number of process in parallel, default is 5.
         mask_path (str): the white background, png format
+        num_class (int): default is 3.
 
     Returns:
         float: the mIOU score
@@ -85,18 +84,17 @@ def get_overall_valid_score(
 
         pred = np.array(pred_list)
         real = np.array(gt_list)
-        for i in [0, 1]:
+        for i in range(num_class):
             if i in pred:
                 inter = sum(np.logical_and(pred == i, real == i))
                 u = sum(np.logical_or(pred == i, real == i))
                 intersection[i] += inter
                 union[i] += u
 
-    intersection = Array("d", [0, 0])
-    union = Array("d", [0, 0])
-
+    intersection = Array("d", [0] * num_class)
+    union = Array("d", [0] * num_class)
     p_list = []
-    for i in range(num_workers):
+    for i in range(len(image_list)):
         p = Process(target=f, args=(intersection, union, image_list[i]))
         p.start()
         p_list.append(p)
@@ -104,7 +102,8 @@ def get_overall_valid_score(
         p.join()
 
     eps = 1e-7
-    class0 = intersection[0] / (union[0] + eps)
-    class1 = intersection[1] / (union[1] + eps)
-    # class2 = intersection[2] / (union[2] + eps)
-    return (class0 + class1) / 2
+    total = 0
+    for i in range(num_class):
+        class_i = intersection[i] / (union[i] + eps)
+        total += class_i
+    return total / num_class

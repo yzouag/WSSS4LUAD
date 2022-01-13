@@ -11,6 +11,7 @@ from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_validation_cam
 from utils.mixup import Mixup
 from timm.data.auto_augment import rand_augment_transform
+# from torch.utils.tensorboard import SummaryWriter
 
 class PolyOptimizer(torch.optim.SGD):
     def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
@@ -38,12 +39,12 @@ class PolyOptimizer(torch.optim.SGD):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-batch", default=20, type=int)
-    parser.add_argument("-epoch", default=20, type=int)
-    parser.add_argument("-lr", default=0.01, type=float)
-    parser.add_argument("-resize", default=224, type=int)
-    parser.add_argument("-test_every", default=5, type=int, help="how often to test a model while training")
-    parser.add_argument("-c", default=3, type=int, help="number of classes")
+    parser.add_argument('-batch', default=20, type=int)
+    parser.add_argument('-epoch', default=20, type=int)
+    parser.add_argument('-lr', default=0.01, type=float)
+    parser.add_argument('-resize', default=224, type=int)
+    parser.add_argument('-test_every', default=5, type=int, help="how often to test a model while training")
+    parser.add_argument('-c','--num_class', default=3, type=int, help="number of classes")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
@@ -51,11 +52,11 @@ if __name__ == '__main__':
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
-    parser.add_argument("-cutmix", type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
-    parser.add_argument("-adl_threshold", type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
-    parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
+    parser.add_argument('-cutmix', type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
+    parser.add_argument('-adl_threshold', type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
+    parser.add_argument('-adl_drop_rate', type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
-    parser.add_argument("-reg", action='store_true', default=False, help="whether to use the area regression")
+    parser.add_argument('-reg', action='store_true', default=False, help="whether to use the area regression")
     parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
     args = parser.parse_args()
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     epochs = args.epoch
     base_lr = args.lr
     resize = args.resize
-    num_class = args.c
+    num_class = args.num_class
     test_every = args.test_every
     devices = args.device
     model_name = args.m
@@ -263,13 +264,13 @@ if __name__ == '__main__':
             valid_image_path = os.path.join(validation_cam_folder_name, model_name)
             if target_dataset == 'wsss':
                 generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
-                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask')
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
             elif target_dataset == 'warwick':
                 generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
-                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8, num_class=num_class)
             elif target_dataset == 'crag':
-                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
-                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8)
+                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, num_class=2)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
             iou_v.append(valid_iou)
             
             if valid_iou > best_val:
@@ -277,7 +278,7 @@ if __name__ == '__main__':
                 best_val = valid_iou
                 torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_best.pth")
         
-        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}')
+        print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}, Valid Dice: {2 * valid_iou / (1 + valid_iou):.4f}')
 
         # if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
         #     torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
