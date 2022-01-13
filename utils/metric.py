@@ -85,15 +85,15 @@ def get_overall_valid_score(
 
         pred = np.array(pred_list)
         real = np.array(gt_list)
-        for i in [0, 1, 2]:
+        for i in [0, 1]:
             if i in pred:
                 inter = sum(np.logical_and(pred == i, real == i))
                 u = sum(np.logical_or(pred == i, real == i))
                 intersection[i] += inter
                 union[i] += u
 
-    intersection = Array("d", [0, 0, 0])
-    union = Array("d", [0, 0, 0])
+    intersection = Array("d", [0, 0])
+    union = Array("d", [0, 0])
 
     p_list = []
     for i in range(num_workers):
@@ -106,5 +106,5 @@ def get_overall_valid_score(
     eps = 1e-7
     class0 = intersection[0] / (union[0] + eps)
     class1 = intersection[1] / (union[1] + eps)
-    class2 = intersection[2] / (union[2] + eps)
-    return (class0 + class1 + class2) / 3
+    # class2 = intersection[2] / (union[2] + eps)
+    return (class0 + class1) / 2

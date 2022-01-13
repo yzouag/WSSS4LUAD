@@ -56,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument("-adl_drop_rate", type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
     parser.add_argument("-reg", action='store_true', default=False, help="whether to use the area regression")
-    parser.add_argument('-dataset', default='warwick', type=str, choices=['warwick', 'wsss'], help='now only support two types: (warwick, wsss)')
+    parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -181,7 +181,7 @@ if __name__ == '__main__':
                         num_classes=3)
 
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(data_path_name='Dataset_warwick/1.training/img', transform=train_transform, cutmix_fn=cutmix_fn)
+    TrainDataset = dataset.OriginPatchesDataset(data_path_name=f'Dataset_{target_dataset}/1.training/img', transform=train_transform, cutmix_fn=cutmix_fn, num_class=num_class)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=4, sampler=TrainDatasampler, drop_last=True)
@@ -235,9 +235,9 @@ if __name__ == '__main__':
         valid_iou = 0
         if test_every != 0 and ((i + 1) % test_every == 0 or (i + 1) == epochs):
             if useresnet:
-                net_cam = network.wideResNet_cam()
+                net_cam = network.wideResNet_cam(num_class=num_class)
             else:
-                net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json')
+                net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json', num_class=num_class)
 
             pretrained = net.state_dict()
             pretrained = {k[7:]: v for k, v in pretrained.items()}
@@ -256,6 +256,9 @@ if __name__ == '__main__':
             elif target_dataset == 'warwick':
                 generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8)
+            elif target_dataset == 'crag':
+                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8)
             iou_v.append(valid_iou)
             
             if valid_iou > best_val:

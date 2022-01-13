@@ -43,7 +43,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
         if majority_vote:
             ensemble_cam = []
         else:
-            ensemble_cam = np.zeros((3, w, h))
+            ensemble_cam = np.zeros((2, w, h))
         
         for scale in scales:
             image_per_scale_path = crop_image_path + image_name + '/' + str(scale)
@@ -75,7 +75,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
                     position_list.append(positions.numpy())
                 cam_list = np.concatenate(cam_list)
                 position_list = np.concatenate(position_list)
-                sum_cam = np.zeros((3, w_, h_))
+                sum_cam = np.zeros((2, w_, h_))
                 sum_counter = np.zeros_like(sum_cam)
                 
                 for k in range(cam_list.shape[0]):
