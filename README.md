@@ -1,13 +1,12 @@
-# WSSS4LUAD
-
-
+# Weakly Supervised Learning for Whole Slide Image Segmentation
 ## baseline
-
 https://arxiv.org/pdf/2110.08048.pdf
 
 ## data
-
-for the training set, the average size of images is (224, 224).
+Now we are testing our model on three different dataset, they are:
+- [https://wsss4luad.grand-challenge.org/WSSS4LUAD/](WSSS4LUAD)
+- [https://warwick.ac.uk/fac/cross_fac/tia/data/glascontest/](GlaS (Gland Segmentation in Colon Histology Images Challenge))
+- [https://warwick.ac.uk/fac/cross_fac/tia/data/mildnet/](Colorectal Adenocarcinoma Gland (CRAG) Dataset)
 
 ## project structure
 
@@ -15,8 +14,14 @@ for the training set, the average size of images is (224, 224).
 ├─network # backbone models
 │  └─structures # scalenet structures
 ├─result # images and logs for experiment results
-├─train
-└─utils	
+├─utils # directory for helper functions
+│  ├─metric.py # F1 score, mIOU, Dice
+│  ├─util.py # most helper functions located
+│  └─generate_cam.py # extract features in image and generate the main
+├─prepare_cls_inputs.py # prepare the dataset for CAM model (crop images, adjust validation gt)
+├─prepare_seg_inputs.py # generate intermediate results (train image CAM)
+├─dataset.py # definition of Dataset and Dataloader
+└─main.py # train for CAM phase
 ```
 
 ## model design
@@ -58,12 +63,15 @@ for the training set, the average size of images is (224, 224).
 
 ### 5.improvements: (`train.py`)
 1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174] (**Effective, Done**)
-2. large model: resnest269 (**In Progress**)
-3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5) (**Not, Required, Using CutMix**)
-4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced) (**In progress**)
-5. generate pseudo mask without model for single label patches (require corrosion and smoothing ) (**In Progress**)
-6. activation drop out: randomly drop high activation (**Testing, Done**)
-7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area)
-8. diff loss weights for single-label / multi-label / mixed label
-9. contrastive loss (reduce cosine distance for same category and enlarge it for the different, top2 loss_conl)
-10. post-process: 10.1 drop catogory whose area < 5% in subpatch pseudo-mask generation (top3); 10.2 after bg mask, use knn to indentify small area pixels (top1); 10.3 rm small tumer and stroma in normal (top1)
+2. large model: resnest269 (**Not effective, Done**)
+3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5) (**Not effective, Done**)
+4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced) (**Not effective, Done**)
+5. generate pseudo mask without model for single label patches (require corrosion and smoothing ) (**Done**)
+6. activation drop out: randomly drop high activation (**Not effective, Done**)
+7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area) (**Not effective, Done**)
+8. diff loss weights for single-label / multi-label / mixed label (**Not effective, Done**)
+9. contrastive loss (reduce cosine distance for same category and enlarge it for the different, top2 loss_conl) (**In progress**)
+10. post-process (**In Progress**)
+    1. drop catogory whose area < 5% in subpatch pseudo-mask generation (top3)
+    2. after bg mask, use knn to indentify small area pixels (top1)
+    3. rm small tumer and stroma in normal (top1)
