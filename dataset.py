@@ -138,13 +138,14 @@ class OfflineDataset(Dataset):
         return im, np.array(positions)
 
 class TrainingSetCAM(Dataset):
-    def __init__(self, data_path_name, transform, patch_size, stride, scales):
+    def __init__(self, data_path_name, transform, patch_size, stride, scales, num_class):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
         self.patch_size = patch_size
         self.stride = stride
         self.scales = scales
+        self.num_class = num_class
 
     def __len__(self):
         return len(self.files)
@@ -157,6 +158,9 @@ class TrainingSetCAM(Dataset):
             for im_list in scaled_im_list:
                 for patch_id in range(len(im_list)):
                     im_list[patch_id] = self.transform(im_list[patch_id])
-        label = np.array([int(self.files[idx][-12]), int(self.files[idx][-9]), int(self.files[idx][-6])])
+        if self.num_class == 0:
+            label = np.array([0])
+        else:
+            label = get_file_label(image_path, num_class=self.num_class)
 
         return self.files[idx], scaled_im_list, scaled_position_list, self.scales, label

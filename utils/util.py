@@ -182,7 +182,8 @@ def get_average_image_size(path):
         height += h
         width += w
 
-    print(height/len(images), width/len(images))
+    print(height//len(images), width//len(images))
+    return height//len(images), width//len(images)
 
 def chunks(lst, num_workers=None, n=None):
     """
@@ -297,3 +298,26 @@ def predict_mask(image, threshold, minimal_size):
     result[result == 0] = 1
     result[result == 255] = 0
     return result
+
+def get_dataset_stats(dataset_root_path):
+    imgs_path = osp(dataset_root_path, "origin_ims")
+    img_h, img_w = get_average_image_size(imgs_path)
+    means, stdevs = [], []
+    img_list = []
+    
+    for file in os.listdir(imgs_path):
+        img = Image.open(osp(imgs_path, file))
+        img = np.asarray(img.resize((img_w, img_h))) # H, W, C
+        img = img[:, :, :, None]
+        img_list.append(img)
+
+    imgs = np.concatenate(img_list, axis=3)
+    imgs = imgs.astype(np.float32) / 255.
+    
+    for i in range(3):
+        pixels = imgs[:, :, i, :].ravel()
+        means.append(np.mean(pixels))
+        stdevs.append(np.std(pixels))
+    
+    print("normMean = {}".format(means))
+    print("normStd = {}".format(stdevs))
