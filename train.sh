@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=1,2,3 python main.py -d 0 1 2 -m resnest269 -resnest -save_every 5
+CUDA_VISIBLE_DEVICES=2 python main.py -d 0 -m test_num_class -resnet -c 2 -dataset crag -test_every 1

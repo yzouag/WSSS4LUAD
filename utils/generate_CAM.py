@@ -12,7 +12,7 @@ from scipy.stats import mode
 
 # IMPORTANT! Note we DO NOT use the norm in all cases.
 
-def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, cam_folder_name, model_name, scales, elimate_noise=False, label_path=None, majority_vote=False):
+def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, cam_folder_name, model_name, scales, elimate_noise=False, label_path=None, majority_vote=False, num_class=3):
     """
     generate the class activation map using the model pass into
 
@@ -43,7 +43,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
         if majority_vote:
             ensemble_cam = []
         else:
-            ensemble_cam = np.zeros((2, w, h))
+            ensemble_cam = np.zeros((num_class, w, h))
         
         for scale in scales:
             image_per_scale_path = crop_image_path + image_name + '/' + str(scale)
@@ -75,7 +75,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
                     position_list.append(positions.numpy())
                 cam_list = np.concatenate(cam_list)
                 position_list = np.concatenate(position_list)
-                sum_cam = np.zeros((2, w_, h_))
+                sum_cam = np.zeros((num_class, w_, h_))
                 sum_counter = np.zeros_like(sum_cam)
                 
                 for k in range(cam_list.shape[0]):
@@ -93,7 +93,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
                         with open(f'val_image_label/{label_path}') as f:
                             big_labels = json.load(f)
                         big_label = big_labels[f'{image_name}.png']        
-                        for k in range(3):
+                        for k in range(num_class):
                             if big_label[k] == 0:
                                 norm_cam[k, :, :] = -np.inf
                 
@@ -110,7 +110,7 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
                 with open(f'val_image_label/{label_path}') as f:
                     big_labels = json.load(f)
                 big_label = big_labels[f'{image_name}.png']        
-                for k in range(3):
+                for k in range(num_class):
                     if big_label[k] == 0:
                         ensemble_cam[k, :, :] = -np.inf
                         
