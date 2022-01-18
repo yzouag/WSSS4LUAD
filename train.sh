@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=2 python main.py -d 0 -m test_num_class -resnet -c 2 -dataset crag -test_every 1
+CUDA_VISIBLE_DEVICES=2 python main.py -d 0 -m glas_11256 -resnet -dataset warwick -test_every 5 -epoch 30

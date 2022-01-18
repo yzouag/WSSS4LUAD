@@ -6,6 +6,7 @@ from tqdm import tqdm
 from collections import Counter
 from utils.util import crop_validation_images
 import png
+import yaml
 
 def online_cut_patches(im, im_size=96, stride=32):
     """
@@ -207,16 +208,16 @@ def prepare_crag(side_length: int, stride: int) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-dataset', default='warwick', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types: (warwick, wsss)')
-    parser.add_argument('-side_length', default=112, type=int)
-    parser.add_argument('-stride', default=56, type=int)
     args = parser.parse_args()
-    
-    dataset = args.dataset
-    side_length = args.side_length
-    stride = args.stride
 
-    if dataset == 'warwick':
+    with open('configuration.yml') as f:
+        config = yaml.safe_load(f)
+    target_dataset = args.dataset
+    side_length = config[target_dataset]['side_length']
+    stride = config[target_dataset]['stride']
+
+    if target_dataset == 'warwick':
         prepare_warwick(side_length, stride)
     
-    if dataset == 'crag':
+    if target_dataset == 'crag':
         prepare_crag(side_length, stride)

@@ -12,43 +12,44 @@ import torch.nn.functional as F
 from dataset import TrainingSetCAM
 import network
 from utils.util import predict_mask
+import yaml
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-batch", default=20, type=int)
-    parser.add_argument("-epoch", default=36, type=int)
-    parser.add_argument("-lr", default=0.01, type=float)
-    parser.add_argument("-resize", default=224, type=int)
-    parser.add_argument("-side_length", default=224, type=int)
-    parser.add_argument("-stride", default=int(224//3), type=int)
+    parser.add_argument('-batch', default=20, type=int)
+    parser.add_argument('-lr', default=0.01, type=float)
+    parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
-    parser.add_argument("-c", default=2, type=int, help="number of classes")
     args = parser.parse_args()
 
     batch_size = args.batch
-    epochs = args.epoch
     base_lr = args.lr
-    resize = args.resize
+    target_dataset = args.dataset
     devices = args.device
     ckpt = args.ckpt
-    side_length = args.side_length
-    stride = args.stride
-    num_class = args.c
 
-    train_pseudo_mask_path = 'train_pseudo_mask'
+    with open('configuration.yml') as f:
+        data = yaml.safe_load(f)
+    mean = data[target_dataset]['mean']
+    std = data[target_dataset]['std']
+    side_length = data[target_dataset]['side_length']
+    stride = data[target_dataset]['stride']
+    num_class = data[target_dataset]['num_class']
+    network_image_size = data['network_image_size']
+    scales = data['scales']
+
+    train_pseudo_mask_path = f'{target_dataset}_train_pseudo_mask'
     if not os.path.exists(train_pseudo_mask_path):
         os.mkdir(train_pseudo_mask_path)
 
-    train_dataset_path = 'Dataset_crag/1.training/origin_ims'
-    scales = [1, 1.25, 1.5, 1.75, 2]
+    train_dataset_path = f'Dataset_{target_dataset}/1.training/origin_ims'
     majority_vote = False
     
-    # IMPORTANT! Modify the nprmalization part here!!
     dataset = TrainingSetCAM(data_path_name=train_dataset_path, transform=transforms.Compose([
-                        transforms.Resize((resize,resize)),
+                        transforms.Resize((network_image_size, network_image_size)),
                         transforms.ToTensor(),
-                        transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+                        transforms.Normalize(mean=mean, std=std)
                 ]), patch_size=side_length, stride=stride, scales=scales, num_class=0
     )
     dataLoader = DataLoader(dataset, batch_size=1, drop_last=False)
@@ -144,4 +145,4 @@ if __name__ == '__main__':
 
             if not os.path.exists(f'{train_pseudo_mask_path}'):
                 os.mkdir(f'{train_pseudo_mask_path}')
-            np.save(f'{train_pseudo_mask_path}/{im_name[0][:-4]}.npy', result_label)
+            np.save(f'{train_pseudo_mask_path}/{im_name[0].split(".")[0]}.npy', result_label)

@@ -10,25 +10,29 @@ import torch
 import os
 from scipy.stats import mode
 
-# IMPORTANT! Note we DO NOT use the norm in all cases.
 
-def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, cam_folder_name, model_name, scales, elimate_noise=False, label_path=None, majority_vote=False, num_class=3):
+def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, cam_folder_name, model_name, elimate_noise=False, label_path=None, majority_vote=False):
     """
     generate the class activation map using the model pass into
 
     Args:
-        net (torch.models): the classification model
-        side_length (int)
+        net (torch.model): the classification model
+        config (dict): configs from configuration.yml
+        target_dataset (str): current dataset name (warwick, wsss, glas)
         batch_size (int): batch to process the cam
-        resize (int): the size image is changed to
-        dataset_path (string): the address of the image dataset
-        cam_folder_name (string): the folder to store the cam output
-        model_name (string): the name for this cam_output model
-        scales (list): a list of different scales to do model ensemble
-        eliminate_noise: if use image-level label to cancel some of the noise
-        label_path (string): if `eliminate_noise` is True, input the labels path
-        majority_vote (bool): whether to use the majortity vote to ensemble
+        dataset_path (str): the address of the image dataset
+        cam_folder_name (str): the folder to store the cam output
+        model_name (str): the name for this cam_output model
+        elimate_noise (bool, optional): use image-level label to cancel some of the noise. Defaults to False.
+        label_path (str, optional): if `eliminate_noise` is True, input the labels path. Defaults to None.
+        majority_vote (bool, optional): use the majortity vote strategy for model ensemble. Defaults to False.
     """
+    side_length = config[target_dataset]['side_length']
+    mean = config[target_dataset]['mean']
+    std = config[target_dataset]['std']
+    num_class = config[target_dataset]['num_class']
+    network_image_size = config['network_image_size']
+    scales = config['scales']
 
     net.cuda()
     net.eval()
@@ -49,9 +53,9 @@ def generate_validation_cam(net, side_length, batch_size, resize, dataset_path, 
             image_per_scale_path = crop_image_path + image_name + '/' + str(scale)
             scale = float(scale)
             offlineDataset = dataset.OfflineDataset(image_per_scale_path, transform=transforms.Compose([
-                    transforms.Resize((resize,resize)),
+                    transforms.Resize((network_image_size, network_image_size)),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+                    transforms.Normalize(mean=mean, std=std)
                 ])
             )
             offlineDataloader = DataLoader(offlineDataset, batch_size=batch_size, drop_last=False)

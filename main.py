@@ -11,6 +11,7 @@ from utils.metric import get_overall_valid_score
 from utils.generate_CAM import generate_validation_cam
 from utils.mixup import Mixup
 from timm.data.auto_augment import rand_augment_transform
+import yaml
 # from torch.utils.tensorboard import SummaryWriter
 
 class PolyOptimizer(torch.optim.SGD):
@@ -42,16 +43,13 @@ if __name__ == '__main__':
     parser.add_argument('-batch', default=20, type=int)
     parser.add_argument('-epoch', default=20, type=int)
     parser.add_argument('-lr', default=0.01, type=float)
-    parser.add_argument('-resize', default=224, type=int)
     parser.add_argument('-test_every', default=5, type=int, help="how often to test a model while training")
-    parser.add_argument('-c','--num_class', default=3, type=int, help="number of classes")
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
     parser.add_argument('-resnest', action='store_true', default=False)
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
-    parser.add_argument('-note', type=str, help='special experiments with this training', required=False)
     parser.add_argument('-cutmix', type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
     parser.add_argument('-adl_threshold', type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
     parser.add_argument('-adl_drop_rate', type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
@@ -63,8 +61,6 @@ if __name__ == '__main__':
     batch_size = args.batch
     epochs = args.epoch
     base_lr = args.lr
-    resize = args.resize
-    num_class = args.num_class
     test_every = args.test_every
     devices = args.device
     model_name = args.m
@@ -72,7 +68,6 @@ if __name__ == '__main__':
     useresnest = args.resnest
     testonly = args.test
     ckpt = args.ckpt
-    remark = args.note
     cutmix_alpha = args.cutmix
     adl_threshold = args.adl_threshold
     adl_drop_rate = args.adl_drop_rate
@@ -81,6 +76,14 @@ if __name__ == '__main__':
     target_dataset = args.dataset
     if cutmix_alpha == 0:
         activate_regression = False
+
+    with open('configuration.yml') as f:
+        config = yaml.safe_load(f)
+    mean = config[target_dataset]['mean']
+    std = config[target_dataset]['std']
+    num_class = config[target_dataset]['num_class']
+    network_image_size = config['network_image_size']
+    scales = config['scales']
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
@@ -91,7 +94,6 @@ if __name__ == '__main__':
     
     validation_cam_folder_name = f'{target_dataset}_valid_out_cam'
     validation_dataset_path = f'Dataset_{target_dataset}/2.validation/img'
-    scales = [1, 1.25, 1.5, 1.75, 2]
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
 
@@ -118,7 +120,7 @@ if __name__ == '__main__':
         print("successfully load model states.")
         
         # calculate MIOU
-        generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, ckpt, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+        generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, ckpt, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
         valid_image_path = f'{target_dataset}_valid_out_cam/{ckpt}'
         valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
         print(f"test mIOU score is: {valid_iou}")
@@ -153,7 +155,6 @@ if __name__ == '__main__':
         resnest269_path = "weights/resnest269-0cc87c48.pth"
         net = network.resnest269()
         net.load_state_dict(torch.load(resnest269_path),strict=False)
-        # reporter = report(batch_size, epochs, base_lr, resize, model_name, back_bone=prefix, remark=remark, scales=scales)
 
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
@@ -166,19 +167,19 @@ if __name__ == '__main__':
         )
         train_transform = transforms.Compose([
             tfm,
-            transforms.RandomResizedCrop(size=resize, scale=scale),
+            transforms.RandomResizedCrop(size=network_image_size, scale=scale),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             # transforms.ToTensor(),
-            transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+            transforms.Normalize(mean=mean, std=std)
         ])
     else:
         train_transform = transforms.Compose([
-            transforms.RandomResizedCrop(size=resize, scale=scale),
+            transforms.RandomResizedCrop(size=network_image_size, scale=scale),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             # transforms.ToTensor(),
-            transforms.Normalize(mean=[0.678,0.505,0.735], std=[0.144,0.208,0.174])
+            transforms.Normalize(mean=mean, std=std)
         ])
 
     #cutmix init
@@ -263,13 +264,13 @@ if __name__ == '__main__':
             # calculate MIOU
             valid_image_path = os.path.join(validation_cam_folder_name, model_name)
             if target_dataset == 'wsss':
-                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False, is_valid=True)
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
             elif target_dataset == 'warwick':
-                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales)
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8, num_class=num_class)
             elif target_dataset == 'crag':
-                generate_validation_cam(net_cam, 224, batch_size, resize, validation_dataset_path, validation_cam_folder_name, model_name, scales, num_class=2)
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
             iou_v.append(valid_iou)
             
