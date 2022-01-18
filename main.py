@@ -12,31 +12,7 @@ from utils.generate_CAM import generate_validation_cam
 from utils.mixup import Mixup
 from timm.data.auto_augment import rand_augment_transform
 import yaml
-# from torch.utils.tensorboard import SummaryWriter
-
-class PolyOptimizer(torch.optim.SGD):
-    def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
-        super().__init__(params, lr, weight_decay)
-
-        self.global_step = 0
-        self.max_step = max_step
-        self.momentum = momentum
-
-        self.__initial_lr = [group['lr'] for group in self.param_groups]
-
-
-    def step(self, closure=None):
-
-        if self.global_step < self.max_step:
-            lr_mult = (1 - self.global_step / self.max_step) ** self.momentum
-
-            for i in range(len(self.param_groups)):
-                self.param_groups[i]['lr'] = self.__initial_lr[i] * lr_mult
-
-        super().step(closure)
-
-        self.global_step += 1
-
+from utils.torchutils import PolyOptimizer
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -51,8 +27,8 @@ if __name__ == '__main__':
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     parser.add_argument('-cutmix', type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
-    parser.add_argument('-adl_threshold', type=float, default="0.0", help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
-    parser.add_argument('-adl_drop_rate', type=float, default="0.0", help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
+    parser.add_argument('-adl_threshold', type=float, default=None, help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
+    parser.add_argument('-adl_drop_rate', type=float, default=None, help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
     parser.add_argument('-reg', action='store_true', default=False, help="whether to use the area regression")
     parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
@@ -126,6 +102,7 @@ if __name__ == '__main__':
         print(f"test mIOU score is: {valid_iou}")
         exit()
 
+    # EXCLUSIVELY FOR TRAINING
     if model_name == None:
         raise Exception("Model name is not provided for the traning phase!")
     # load model
@@ -133,28 +110,16 @@ if __name__ == '__main__':
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
-        if adl_drop_rate == 0:
-            print("Original Network used.")
-            net = network.wideResNet(regression_activate=activate_regression, num_class=num_class)
-            # print(net.state_dict().keys())
-        else:
-            print("adl network used!")
-            net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression, num_class=num_class)
+        net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression, num_class=num_class)
         net.load_state_dict(torch.load(resnet38_path), strict=False)
-    else:
-        prefix = "scalenet"
-        if adl_drop_rate == 0:
-            print("Original Network used.")
-            net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, regression_activate=activate_regression)
-        else:
-            print("adl network used!")
-            net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
- 
-    if useresnest:
+    elif useresnest:
         prefix = "resneSt"
         resnest269_path = "weights/resnest269-0cc87c48.pth"
         net = network.resnest269()
-        net.load_state_dict(torch.load(resnest269_path),strict=False)
+        net.load_state_dict(torch.load(resnest269_path), strict=False)
+    else:
+        prefix = "scalenet"
+        net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
 
     net = torch.nn.DataParallel(net, device_ids=devices).cuda()
     
@@ -165,7 +130,10 @@ if __name__ == '__main__':
             config_str='rand-m9-n3-mstd0.5', 
             hparams={'translate_const': 60, 'img_mean': (124, 116, 104)}
         )
-        train_transform = transforms.Compose([
+    else:
+        tfm = transforms.RandomHorizontalFlip(0.)
+
+    train_transform = transforms.Compose([
             tfm,
             transforms.RandomResizedCrop(size=network_image_size, scale=scale),
             transforms.RandomHorizontalFlip(),
@@ -173,16 +141,8 @@ if __name__ == '__main__':
             # transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std)
         ])
-    else:
-        train_transform = transforms.Compose([
-            transforms.RandomResizedCrop(size=network_image_size, scale=scale),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            # transforms.ToTensor(),
-            transforms.Normalize(mean=mean, std=std)
-        ])
 
-    #cutmix init
+    # CUTMIX EXCLUSIVE
     if cutmix_alpha == 0:
         print("cutmix not enabled!")
         cutmix_fn = None
@@ -281,9 +241,6 @@ if __name__ == '__main__':
         
         print(f'Epoch [{i+1}/{epochs}], Train Loss: {train_loss:.4f}, Valid mIOU: {valid_iou:.4f}, Valid Dice: {2 * valid_iou / (1 + valid_iou):.4f}')
 
-        # if save_every != 0 and (i + 1) % save_every == 0 and (i + 1) != epochs:
-        #     torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_ep" + str(i+1) + ".pth")
-
     torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + "_last.pth")
 
     plt.figure(1)
@@ -293,14 +250,6 @@ if __name__ == '__main__':
     plt.title('train loss')
     plt.savefig('./result/train_loss.png')
     plt.close()
-
-    # plt.figure(2)
-    # plt.plot(regression_loss_track, label="reg loss")
-    # plt.legend()
-    # plt.ylabel('loss value')
-    # plt.xlabel('batchs*5')
-    # plt.title('loss')
-    # plt.savefig('./result/loss_trackadl.png')
 
     plt.figure(3)
     plt.plot(iou_v)

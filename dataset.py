@@ -14,13 +14,6 @@ def get_file_label(filename, num_class=3):
         l.insert(0, int(filename[begin-3*i]))
     return np.array(l)
 
-# def find_relative_label(label):
-#     label_dic = {tuple((1, 0, 0)): [tuple((1, 0, 0)), tuple((1, 1, 0)), tuple((1, 1, 1))],
-#                 tuple((0, 1, 0)): [tuple((1, 1, 0)), tuple((0, 1, 0)), tuple((0, 1, 1))],
-#                 tuple((0, 0, 1)): [tuple((1, 0, 1)), tuple((0, 1, 1)), tuple((0, 0, 1))]}
-
-#     return label_dic[label]
-
 class OriginPatchesDataset(Dataset):
     def __init__(self, data_path_name = "Dataset_wsss/1.training", transform=None, cutmix_fn=None, num_class=3):
         self.path = data_path_name
@@ -29,18 +22,6 @@ class OriginPatchesDataset(Dataset):
         self.filedic = {}
         self.cutmix_fn = cutmix_fn
         self.num_class = num_class
-        # self.statedic = {}
-        # if self.cutmix_fn:
-        #     for filename in self.files:
-        #         filelabel = tuple(get_file_label(filename=filename))
-        #         if filelabel not in self.filedic:
-        #             self.filedic[filelabel] = [filename]
-        #         else:
-        #             self.filedic[filelabel].append(filename)
-        #         if filelabel not in self.statedic:
-        #             self.statedic[filelabel] = 1
-        
-        # self.statedic[tuple((0, 1, 1))] = 1
 
     def __len__(self):
         return len(self.files)
