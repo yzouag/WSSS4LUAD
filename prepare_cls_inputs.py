@@ -44,6 +44,26 @@ def online_cut_patches(im, im_size=96, stride=32):
             position_list.append((i,j))
     return im_list, position_list
 
+def prepare_wsss(side_length: int, stride: int) -> None:
+    """
+    offline crop the images into wsss_valid_out_cam/crop_images
+
+    Args:
+        side_length (int): the crop image length
+        stride (int): the steps for cutting a new image
+    """
+    print('start processing validation and test images...')
+
+    validation_cam_folder_name = 'wsss_valid_out_cam'
+    validation_dataset_path = 'Dataset_wsss/2.validation/img'
+    scales = [1, 1.25, 1.5, 1.75, 2]
+    if not os.path.exists(validation_cam_folder_name):
+        os.mkdir(validation_cam_folder_name)
+
+    print('crop validation set images ...')
+    crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_cam_folder_name)
+    print('cropping finishes!')
+
 def prepare_warwick(side_length: int, stride: int) -> None:
     """
     crop the training images and rename it with project convention
