@@ -95,10 +95,18 @@ if __name__ == '__main__':
         net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
         print("successfully load model states.")
         
+        valid_image_path = os.path.join(validation_cam_folder_name, model_name)
         # calculate MIOU
-        generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, ckpt, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-        valid_image_path = f'{target_dataset}_valid_out_cam/{ckpt}'
-        valid_iou = get_overall_valid_score(valid_image_path, num_workers=8)
+        if target_dataset == 'wsss':
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
+        elif target_dataset == 'warwick':
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
+            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8, num_class=num_class)
+        elif target_dataset == 'crag':
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
+            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
+        
         print(f"test mIOU score is: {valid_iou}")
         exit()
 
@@ -224,7 +232,7 @@ if __name__ == '__main__':
             # calculate MIOU
             valid_image_path = os.path.join(validation_cam_folder_name, model_name)
             if target_dataset == 'wsss':
-                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, epoch_i=i+1, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
             elif target_dataset == 'warwick':
                 generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
@@ -233,6 +241,7 @@ if __name__ == '__main__':
                 generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
             iou_v.append(valid_iou)
+            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + f"_{i+1}.pth")
             
             if valid_iou > best_val:
                 print("Updating the best model..........................................")

@@ -64,11 +64,11 @@ def prepare_wsss(side_length: int, stride: int) -> None:
     crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_cam_folder_name)
     print('cropping finishes!')
 
-def prepare_warwick(side_length: int, stride: int) -> None:
+def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> None:
     """
     crop the training images and rename it with project convention
     e.g. imageName-[tumor, stroma, normal].png
-    the image will be resized to (224, 224)
+    the image will be resized to network image size
 
     Args:
         side_length (int): the crop image length
@@ -101,7 +101,7 @@ def prepare_warwick(side_length: int, stride: int) -> None:
                 has_tumor = 1
             if np.sum(crop_mask == 0) / crop_mask.size > 0.05:
                 has_normal = 1
-            Image.fromarray(crop_im).resize((224,224)).save(os.path.join(destination, f'train_{i}_{j}-[{has_tumor}, {has_normal}].png'))
+            Image.fromarray(crop_im).resize((network_image_size, network_image_size)).save(os.path.join(destination, f'train_{i}_{j}-[{has_tumor}, {has_normal}].png'))
             summary.append((has_tumor, has_normal))
     
     print(Counter(summary))
@@ -116,7 +116,7 @@ def prepare_warwick(side_length: int, stride: int) -> None:
         os.mkdir(validation_cam_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, network_image_size, int(network_image_size//3), scales, validation_cam_folder_name)
     print('cropping finishes!')
 
     def process_mask(mask_folder_path, destination):
@@ -144,11 +144,10 @@ def prepare_warwick(side_length: int, stride: int) -> None:
     process_mask(test_mask_path, destination)
     print('mask processing finished!')
 
-def prepare_crag(side_length: int, stride: int) -> None:
+def prepare_crag(side_length: int, stride: int, network_image_size: int) -> None:
     """
     crop the training images and rename it with project convention
     e.g. imageName-[tumor, stroma, normal].png
-    the image will be resized to (224, 224)
 
     Args:
         side_length (int): the crop image length
@@ -196,7 +195,7 @@ def prepare_crag(side_length: int, stride: int) -> None:
         os.mkdir(validation_cam_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, 224, int(224//3), scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, network_image_size, int(network_image_size//3), scales, validation_cam_folder_name)
     print('cropping finishes!')
 
     def process_mask(mask_folder_path, destination):
@@ -235,9 +234,10 @@ if __name__ == "__main__":
     target_dataset = args.dataset
     side_length = config[target_dataset]['side_length']
     stride = config[target_dataset]['stride']
+    network_image_size = config['network_image_size']
 
     if target_dataset == 'warwick':
-        prepare_warwick(side_length, stride)
+        prepare_warwick(side_length, stride, network_image_size)
     
     if target_dataset == 'crag':
-        prepare_crag(side_length, stride)
+        prepare_crag(side_length, stride, network_image_size)

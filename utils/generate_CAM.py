@@ -11,7 +11,7 @@ import os
 from scipy.stats import mode
 
 
-def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, cam_folder_name, model_name, elimate_noise=False, label_path=None, majority_vote=False):
+def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, cam_folder_name, model_name, epoch_i, elimate_noise=False, label_path=None, majority_vote=False):
     """
     generate the class activation map using the model pass into
 
@@ -27,7 +27,7 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
         label_path (str, optional): if `eliminate_noise` is True, input the labels path. Defaults to None.
         majority_vote (bool, optional): use the majortity vote strategy for model ensemble. Defaults to False.
     """
-    side_length = config[target_dataset]['side_length']
+    side_length = config['network_image_size']
     mean = config[target_dataset]['mean']
     std = config[target_dataset]['std']
     num_class = config[target_dataset]['num_class']
@@ -119,7 +119,9 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
                         ensemble_cam[k, :, :] = -np.inf
                         
             result_label = ensemble_cam.argmax(axis=0)
-
         if not os.path.exists(f'{cam_folder_name}/{model_name}'):
             os.mkdir(f'{cam_folder_name}/{model_name}')
+        if not os.path.exists(f'{cam_folder_name}/{model_name}_{epoch_i}'):
+            os.mkdir(f'{cam_folder_name}/{model_name}_{epoch_i}')
+        np.save(f'{cam_folder_name}/{model_name}_{epoch_i}/{image_name}.npy', ensemble_cam)
         np.save(f'{cam_folder_name}/{model_name}/{image_name}.npy', result_label)

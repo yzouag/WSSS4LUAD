@@ -1,1 +1,2 @@
-CUDA_VISIBLE_DEVICES=0 python main.py -d 0 -m glas_11256 -resnet -dataset warwick -test_every 7 -epoch 30
+CUDA_VISIBLE_DEVICES=0 python main.py -d 0 -m multickpt -resnet -dataset wsss -test_every 4 -epoch 48
+# CUDA_VISIBLE_DEVICES=0 python main.py -d 0 -m glas_11256 -resnet -dataset warwick -test -ckpt resnet_glas_11256_last
