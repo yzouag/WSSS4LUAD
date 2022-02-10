@@ -39,11 +39,11 @@ if __name__ == '__main__':
     network_image_size = data['network_image_size']
     scales = data['scales']
 
-    train_pseudo_mask_path = f'{target_dataset}_train_pseudo_mask'
+    train_pseudo_mask_path = f'{ckpt}_train_pseudo_mask'
     if not os.path.exists(train_pseudo_mask_path):
         os.mkdir(train_pseudo_mask_path)
 
-    train_dataset_path = f'Dataset_{target_dataset}/1.training/origin_ims'
+    train_dataset_path = f'Dataset_{target_dataset}/1.training/img'
     majority_vote = False
     
     dataset = TrainingSetCAM(data_path_name=train_dataset_path, transform=transforms.Compose([

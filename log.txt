@@ -1,0 +1,48 @@
+
+start
+00.npy: blue/blue+red 0.14541306436119117,         green/correct 0.16456680665733395
+
+start
+39.npy: blue/blue+red 0.4001706636903265,         green/correct 0.21035410666254495
+38.npy: blue/blue+red 0.47507922288368815,         green/correct 0.0321498718195532
+37.npy: blue/blue+red 0.3022639142335766,         green/correct 0.2232353888774226
+36.npy: blue/blue+red 0.42554982046678635,         green/correct 0.14198483570516443
+35.npy: blue/blue+red 0.19577893835106716,         green/correct 0.34257850811979107
+34.npy: blue/blue+red 0.5206727492579971,         green/correct 0.1564136455286415
+33.npy: blue/blue+red 0.3124066660143038,         green/correct 0.10438216493451212
+32.npy: blue/blue+red 0.6762693089185546,         green/correct 0.11519245625373147
+31.npy: blue/blue+red 0.21618688372708622,         green/correct 0.24433415133218125
+30.npy: blue/blue+red 0.10944422852701127,         green/correct 0.05947349732292675
+29.npy: blue/blue+red 0.6612032394909372,         green/correct 0.19373457449909634
+28.npy: blue/blue+red 0.5727937043282744,         green/correct 0.1548531573391735
+27.npy: blue/blue+red 0.2553939962476548,         green/correct 0.06819984139571768
+26.npy: blue/blue+red 0.24585350369018333,         green/correct 0.08930857010158398
+25.npy: blue/blue+red 0.5476761946323369,         green/correct 0.03569508654983335
+24.npy: blue/blue+red 0.35976528427563237,         green/correct 0.05510034279628582
+23.npy: blue/blue+red 0.5232779398706077,         green/correct 0.3623639369861755
+22.npy: blue/blue+red 0.44246839511463465,         green/correct 0.26989260352238886
+21.npy: blue/blue+red 0.2209759481961147,         green/correct 0.19540130302190187
+20.npy: blue/blue+red 0.25246255566050463,         green/correct 0.2113837776275047
+19.npy: blue/blue+red 0.4133044107013738,         green/correct 0.1379196366980915
+18.npy: blue/blue+red 0.31995477671000566,         green/correct 0.6207208111635378
+17.npy: blue/blue+red 0.5693972835314092,         green/correct 0.16847056505731842
+16.npy: blue/blue+red 0.44800950683303625,         green/correct 0.20943278089421025
+15.npy: blue/blue+red nan,         green/correct 0.0
+14.npy: blue/blue+red 0.0714166108506363,         green/correct 0.04505909203895781
+13.npy: blue/blue+red 0.0287816489937243,         green/correct 0.1420772324514548
+12.npy: blue/blue+red 0.15973401245048105,         green/correct 0.2498085428942063
+11.npy: blue/blue+red 0.4284323722999907,         green/correct 0.21554627592806633
+10.npy: blue/blue+red 0.44974003466204504,         green/correct 0.05833968012185834
+09.npy: blue/blue+red 0.39246774683984187,         green/correct 0.21931862791906717
+08.npy: blue/blue+red 0.5472047389855609,         green/correct 0.033710524239847835
+07.npy: blue/blue+red 0.0033922771562612773,         green/correct 0.06538837057930137
+06.npy: blue/blue+red 0.10159777700590483,         green/correct 0.07311073920990822
+05.npy: blue/blue+red nan,         green/correct 0.0
+04.npy: blue/blue+red 0.2525033550118716,         green/correct 0.1311329013154416
+03.npy: blue/blue+red 0.22945558739255015,         green/correct 0.10905838883528277
+02.npy: blue/blue+red nan,         green/correct 0.0
+01.npy: blue/blue+red nan,         green/correct 0.0
+00.npy: blue/blue+red 0.14541306436119117,         green/correct 0.16456680665733395
+
+start
+39.npy: blue/blue+red 0.4001706636903265,         green/correct 0.21035410666254495
