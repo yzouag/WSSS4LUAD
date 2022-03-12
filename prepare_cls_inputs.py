@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 from PIL import Image
 import os
@@ -8,14 +9,16 @@ from utils.util import crop_validation_images
 import png
 import yaml
 
-def online_cut_patches(im, im_size=96, stride=32):
+def online_cut_patches(im, im_size, stride):
     """
     function for crop the image to subpatches, will include corner cases
     the return position (x,y) is the up left corner of the image
+    
     Args:
         im (np.ndarray): the image for cropping
-        im_size (int, optional): the sub-image size. Defaults to 56.
-        stride (int, optional): the pixels between two sub-images. Defaults to 28.
+        im_size (int): the sub-image size.
+        stride (int): the pixels between two sub-images.
+    
     Returns:
         (list, list): list of image reference and list of its corresponding positions
     """
@@ -44,9 +47,9 @@ def online_cut_patches(im, im_size=96, stride=32):
             position_list.append((i,j))
     return im_list, position_list
 
-def prepare_wsss(side_length: int, stride: int) -> None:
+def prepare_luad(side_length: int, stride: int, scales: List[int]) -> None:
     """
-    offline crop the images into wsss_valid_out_cam/crop_images
+    offline crop the images into luad_valid/crop_images with specified scales
 
     Args:
         side_length (int): the crop image length
@@ -54,17 +57,17 @@ def prepare_wsss(side_length: int, stride: int) -> None:
     """
     print('start processing validation and test images...')
 
-    validation_cam_folder_name = 'wsss_valid_out_cam'
-    validation_dataset_path = 'Dataset_wsss/2.validation/img'
-    scales = [1, 1.25, 1.5, 1.75, 2]
-    if not os.path.exists(validation_cam_folder_name):
-        os.mkdir(validation_cam_folder_name)
+    validation_folder_name = 'luad_valid'
+    validation_dataset_path = 'Dataset_luad/2.validation/img'
+
+    if not os.path.exists(validation_folder_name):
+        os.mkdir(validation_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_folder_name)
     print('cropping finishes!')
 
-def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> None:
+def prepare_glas(side_length: int, stride: int, scales: List[int], network_image_size: int) -> None:
     """
     crop the training images and rename it with project convention
     e.g. imageName-[tumor, stroma, normal].png
@@ -75,9 +78,9 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
         stride (int): the steps for cutting a new image
     """
     
-    image_path = 'Dataset_warwick/1.training/origin_ims'
-    mask_path = 'Dataset_warwick/1.training/mask'
-    destination = 'Dataset_warwick/1.training/img' # the output directory of the cropped images
+    image_path = 'Dataset_glas/1.training/origin_ims'
+    mask_path = 'Dataset_glas/1.training/mask'
+    destination = 'Dataset_glas/1.training/img' # the output directory of the cropped images
     if not os.path.exists(destination):
         os.mkdir(destination)
     
@@ -97,7 +100,9 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
             crop_mask = mask[position[0]:position[0]+side_length, position[1]:position[1]+side_length]
             has_tumor = 0
             has_normal = 0
-            if np.sum(crop_mask > 0) / crop_mask.size > 0.05: # 实际上0是normal， 1是tumor， 基于dataset提供的gt
+
+            # if crop contains at least 5% pixels as corresponding class, we define it exists in the big label
+            if np.sum(crop_mask > 0) / crop_mask.size > 0.05:
                 has_tumor = 1
             if np.sum(crop_mask == 0) / crop_mask.size > 0.05:
                 has_normal = 1
@@ -109,9 +114,8 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
     print()
     print('start processing validation and test images...')
 
-    validation_cam_folder_name = 'warwick_valid_out_cam'
-    validation_dataset_path = 'Dataset_warwick/2.validation/img'
-    scales = [1, 1.25, 1.5, 1.75, 2]
+    validation_cam_folder_name = 'glas_valid'
+    validation_dataset_path = 'Dataset_glas/2.validation/img'
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
 
@@ -119,32 +123,28 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
     crop_validation_images(validation_dataset_path, network_image_size, network_image_size, scales, validation_cam_folder_name)
     print('cropping finishes!')
 
-    # def process_mask(mask_folder_path, destination):
-    #     for mask_name in os.listdir(mask_folder_path):
-    #         mask = np.asarray(Image.open(os.path.join(mask_folder_path, mask_name))).copy()
-    #         # this three steps, convert tumor to 0, background to 2
-    #         mask[mask > 0] = 3
-    #         mask[mask == 0] = 1
-    #         mask[mask == 3] = 0
-    #         palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
-    #         with open(os.path.join(destination, f'{mask_name.split(".")[0]}.png'), 'wb') as f:
-    #             w = png.Writer(mask.shape[1], mask.shape[0],palette=palette, bitdepth=8)
-    #             w.write(f, mask.astype(np.uint8))
+    # process mask only change the bmp img to png and add the color palette for better visualization
+    def process_mask(mask_folder_path, destination):
+        for mask_name in os.listdir(mask_folder_path):
+            mask = np.asarray(Image.open(os.path.join(mask_folder_path, mask_name))).copy()
+            # this three steps, convert tumor to 0, background to 2
+            mask[mask > 0] = 3
+            mask[mask == 0] = 1
+            mask[mask == 3] = 0
+            palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
+            with open(os.path.join(destination, f'{mask_name.split(".")[0]}.png'), 'wb') as f:
+                w = png.Writer(mask.shape[1], mask.shape[0],palette=palette, bitdepth=8)
+                w.write(f, mask.astype(np.uint8))
 
-    # validation_mask_path = 'Dataset_warwick/2.validation/origin_mask'
-    # destination = 'Dataset_warwick/2.validation/mask'
-    # if not os.path.exists(destination):
-    #     os.mkdir(destination)
-    # process_mask(validation_mask_path, destination)
+    validation_mask_path = 'Dataset_glas/2.validation/origin_mask'
+    destination = 'Dataset_glas/2.validation/mask'
+    if not os.path.exists(destination):
+        os.mkdir(destination)
+    process_mask(validation_mask_path, destination)
 
-    # test_mask_path = 'Dataset_warwick/3.testing/origin_mask'
-    # destination = 'Dataset_warwick/3.testing/mask'
-    # if not os.path.exists(destination):
-    #     os.mkdir(destination)
-    # process_mask(test_mask_path, destination)
-    # print('mask processing finished!')
+    print('mask processing finished!')
 
-def prepare_crag(side_length: int, stride: int, network_image_size: int) -> None:
+def prepare_crag(side_length: int, stride: int, scales: List[int], network_image_size: int) -> None:
     """
     crop the training images and rename it with project convention
     e.g. imageName-[tumor, stroma, normal].png
@@ -190,7 +190,7 @@ def prepare_crag(side_length: int, stride: int, network_image_size: int) -> None
 
     validation_cam_folder_name = 'crag_valid_out_cam'
     validation_dataset_path = 'Dataset_crag/2.validation/img'
-    scales = [1, 1.25, 1.5, 1.75, 2]
+
     if not os.path.exists(validation_cam_folder_name):
         os.mkdir(validation_cam_folder_name)
 
@@ -226,18 +226,23 @@ def prepare_crag(side_length: int, stride: int, network_image_size: int) -> None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-dataset', default='warwick', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types: (warwick, wsss)')
+    parser.add_argument('-dataset', default='luad', type=str, choices=['glas', 'luad', 'crag'], help='now support three types: (glas, luad, crag)')
     args = parser.parse_args()
 
     with open('configuration.yml') as f:
         config = yaml.safe_load(f)
+    
     target_dataset = args.dataset
     side_length = config[target_dataset]['side_length']
     stride = config[target_dataset]['stride']
     network_image_size = config['network_image_size']
+    scales = config['scales']
 
-    if target_dataset == 'warwick':
-        prepare_warwick(side_length, stride, network_image_size)
+    if target_dataset == 'glas':
+        prepare_glas(side_length, stride, scales, network_image_size)
     
     if target_dataset == 'crag':
-        prepare_crag(side_length, stride, network_image_size)
+        prepare_crag(side_length, stride, scales, network_image_size)
+
+    if target_dataset == 'luad':
+        prepare_luad(side_length, stride, scales)
