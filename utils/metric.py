@@ -2,7 +2,7 @@ import os
 from PIL import Image
 import numpy as np
 from multiprocessing import Array, Process
-from utils.util import chunks
+from utils.pyutils import chunks
 import random
 
 def calculate_IOU(pred, real):

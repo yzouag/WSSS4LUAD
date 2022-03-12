@@ -5,7 +5,7 @@ import os
 import argparse
 from tqdm import tqdm
 from collections import Counter
-from utils.util import crop_validation_images
+from utils.pyutils import crop_validation_images
 import png
 import yaml
 
