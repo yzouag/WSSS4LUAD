@@ -67,6 +67,8 @@ def prepare_luad(side_length: int, stride: int, scales: List[int]) -> None:
     crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_folder_name)
     print('cropping finishes!')
 
+    # TODO: generate groundtruth.json for validation images
+
 def prepare_glas(side_length: int, stride: int, scales: List[int], network_image_size: int) -> None:
     """
     crop the training images and rename it with project convention
@@ -114,13 +116,13 @@ def prepare_glas(side_length: int, stride: int, scales: List[int], network_image
     print()
     print('start processing validation and test images...')
 
-    validation_cam_folder_name = 'glas_valid'
+    validation_folder_name = 'glas_valid'
     validation_dataset_path = 'Dataset_glas/2.validation/img'
-    if not os.path.exists(validation_cam_folder_name):
-        os.mkdir(validation_cam_folder_name)
+    if not os.path.exists(validation_folder_name):
+        os.mkdir(validation_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, network_image_size, network_image_size, scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, network_image_size, network_image_size, scales, validation_folder_name)
     print('cropping finishes!')
 
     # process mask only change the bmp img to png and add the color palette for better visualization
@@ -188,14 +190,14 @@ def prepare_crag(side_length: int, stride: int, scales: List[int], network_image
     print()
     print('start processing validation and test images...')
 
-    validation_cam_folder_name = 'crag_valid_out_cam'
+    validation_folder_name = 'crag_valid'
     validation_dataset_path = 'Dataset_crag/2.validation/img'
 
-    if not os.path.exists(validation_cam_folder_name):
-        os.mkdir(validation_cam_folder_name)
+    if not os.path.exists(validation_folder_name):
+        os.mkdir(validation_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, network_image_size, int(network_image_size//3), scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, network_image_size, int(network_image_size//3), scales, validation_folder_name)
     print('cropping finishes!')
 
     def process_mask(mask_folder_path, destination):

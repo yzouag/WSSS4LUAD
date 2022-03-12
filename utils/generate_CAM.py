@@ -11,21 +11,21 @@ import os
 from scipy.stats import mode
 
 
-def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, cam_folder_name, model_name, elimate_noise=False, label_path=None, majority_vote=False):
+def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, validation_folder_name, model_name, elimate_noise=False, label_path=None, majority_vote=False):
     """
-    generate the class activation map using the model pass into
+    Generate the class activation map for the validation set and evaluate.
 
     Args:
         net (torch.model): the classification model
         config (dict): configs from configuration.yml
-        target_dataset (str): current dataset name (warwick, wsss, glas)
+        target_dataset (str): current dataset name (glas, luad, crag)
         batch_size (int): batch to process the cam
         dataset_path (str): the address of the image dataset
-        cam_folder_name (str): the folder to store the cam output
+        folder_name (str): the folder to store the cam output
         model_name (str): the name for this cam_output model
         elimate_noise (bool, optional): use image-level label to cancel some of the noise. Defaults to False.
         label_path (str, optional): if `eliminate_noise` is True, input the labels path. Defaults to None.
-        majority_vote (bool, optional): use the majortity vote strategy for model ensemble. Defaults to False.
+        majority_vote (bool, optional): use the majortity vote strategy for model ensemble. Defaults to False, then we simply add the cams from different scales together and do one argmax operation at last.
     """
     side_length = config['network_image_size']
     mean = config[target_dataset]['mean']
@@ -37,7 +37,7 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
     net.cuda()
     net.eval()
 
-    crop_image_path = f'{cam_folder_name}/crop_images/'
+    crop_image_path = f'{validation_folder_name}/crop_images/'
     image_name_list = os.listdir(crop_image_path)
     extension_name = os.listdir(dataset_path)[0].split('.')[-1]
     
@@ -91,10 +91,10 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
                 norm_cam = sum_cam / sum_counter
                 norm_cam = F.interpolate(torch.unsqueeze(torch.tensor(norm_cam),0), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
 
-                # use the image-level label to eliminate impossible pixel classes
+                # Use the image-level label to eliminate impossible pixel classes
                 if majority_vote:
                     if elimate_noise:
-                        with open(f'val_image_label/{label_path}') as f:
+                        with open(f'{validation_folder_name}/{label_path}') as f:
                             big_labels = json.load(f)
                         big_label = big_labels[f'{image_name}.png']        
                         for k in range(num_class):
@@ -111,7 +111,7 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
             result_label = mode(ensemble_cam, axis=0)[0]
         else:
             if elimate_noise:
-                with open(f'val_image_label/{label_path}') as f:
+                with open(f'{validation_folder_name}/{label_path}') as f:
                     big_labels = json.load(f)
                 big_label = big_labels[f'{image_name}.png']        
                 for k in range(num_class):
@@ -119,9 +119,6 @@ def generate_validation_cam(net, config, target_dataset, batch_size, dataset_pat
                         ensemble_cam[k, :, :] = -np.inf
                         
             result_label = ensemble_cam.argmax(axis=0)
-        if not os.path.exists(f'{cam_folder_name}/{model_name}'):
-            os.mkdir(f'{cam_folder_name}/{model_name}')
-        # if not os.path.exists(f'{cam_folder_name}/{model_name}_{epoch_i}'):
-        #     os.mkdir(f'{cam_folder_name}/{model_name}_{epoch_i}')
-        # np.save(f'{cam_folder_name}/{model_name}_{epoch_i}/{image_name}.npy', ensemble_cam)
-        np.save(f'{cam_folder_name}/{model_name}/{image_name}.npy', result_label)
+        if not os.path.exists(f'{validation_folder_name}/{model_name}'):
+            os.mkdir(f'{validation_folder_name}/{model_name}')
+        np.save(f'{validation_folder_name}/{model_name}/{image_name}.npy', result_label)

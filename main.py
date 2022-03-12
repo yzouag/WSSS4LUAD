@@ -23,15 +23,14 @@ if __name__ == '__main__':
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-m', type=str, help='the save model name')
     parser.add_argument('-resnet', action='store_true', default=False)
-    parser.add_argument('-resnest', action='store_true', default=False)
     parser.add_argument('-test', action='store_true', default=False)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
-    parser.add_argument('-cutmix', type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable")
+    parser.add_argument('-cutmix', type=float, default="0.0", help="alpha value of beta distribution in cutmix, 0 to disable, only test it on luad dataset to balance labels")
     parser.add_argument('-adl_threshold', type=float, default=None, help="range (0,1], the threhold for defining the salient activation values, 0 to disable")
     parser.add_argument('-adl_drop_rate', type=float, default=None, help="range (0,1], the possibility to drop the high activation areas, 0 to disable")
     parser.add_argument('-randaug', action='store_true', default=False)
     parser.add_argument('-reg', action='store_true', default=False, help="whether to use the area regression")
-    parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
+    parser.add_argument('-dataset', default='luad', type=str, choices=['glas', 'luad', 'crag'], help='we now support three datasets')
     args = parser.parse_args()
 
     batch_size = args.batch
@@ -41,7 +40,6 @@ if __name__ == '__main__':
     devices = args.device
     model_name = args.m
     useresnet = args.resnet
-    useresnest = args.resnest
     testonly = args.test
     ckpt = args.ckpt
     cutmix_alpha = args.cutmix
@@ -63,68 +61,56 @@ if __name__ == '__main__':
 
     if not os.path.exists('modelstates'):
         os.mkdir('modelstates')
-    if not os.path.exists('val_image_label'):
-        os.mkdir('val_image_label')
     if not os.path.exists('result'):
         os.mkdir('result')
     
-    validation_cam_folder_name = f'{target_dataset}_valid_out_cam'
+    validation_folder_name = f'{target_dataset}_valid'
     validation_dataset_path = f'Dataset_{target_dataset}/2.validation/img'
-    if not os.path.exists(validation_cam_folder_name):
-        os.mkdir(validation_cam_folder_name)
 
-    # this part is for test the effectiveness of the class activation map
+    # This part is for testing the existing models in /modelstates/
     if testonly:
         if ckpt == None:
             raise Exception("No checkpoint model is provided")
         
-        # create cam model
+        # Load models
         if useresnet:
             net_cam = network.wideResNet_cam(num_class=num_class)
         else:
             net_cam = network.scalenet101_cam(structure_path='network/structures/scalenet101.json', num_class=num_class)
-        if useresnest:
-            net_cam = network.resnest269_cam()
             
         model_path = "modelstates/" + ckpt + ".pth"
         pretrained = torch.load(model_path)['model']
-        pretrained = {k[7:]: v for k, v in pretrained.items()}
+        pretrained = {k[7:]: v for k, v in pretrained.items()} # TODO: [7:] investigate
         pretrained['fc1.weight'] = pretrained['fc1.weight'].unsqueeze(-1).unsqueeze(-1).to(torch.float64)
         net_cam.load_state_dict(pretrained)
-            
         net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
-        print("successfully load model states.")
+        print("Successfully load model states.")
         
-        valid_image_path = os.path.join(validation_cam_folder_name, model_name)
+        valid_image_path = os.path.join(validation_folder_name, model_name)
         # calculate MIOU
-        if target_dataset == 'wsss':
-            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
-        elif target_dataset == 'warwick':
-            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
-            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8, num_class=num_class)
+        if target_dataset == 'luad':
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_luad/2.validation/mask', num_workers=8, mask_path='Dataset_luad/2.validation/background-mask', num_class=num_class)
+        # Since the validation images all contains tumor and normal tissues, so we basically could not elininate the noise for Glas and Crag dataset.
+        elif target_dataset == 'glas':
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name)
+            valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_glas/2.validation/mask', num_workers=8, num_class=num_class)
         elif target_dataset == 'crag':
-            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
+            generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name)
             valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
         
-        print(f"test mIOU score is: {valid_iou:.4f}, Valid Dice: {2 * valid_iou / (1 + valid_iou):.4f}")
+        print(f"Test mIOU score is: {valid_iou:.4f}, Valid Dice: {2 * valid_iou / (1 + valid_iou):.4f}")
         exit()
 
     # EXCLUSIVELY FOR TRAINING
     if model_name == None:
         raise Exception("Model name is not provided for the traning phase!")
     # load model
-    prefix = ""
     if useresnet:
         prefix = "resnet"
         resnet38_path = "weights/res38d.pth"
         net = network.wideResNet(adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression, num_class=num_class)
         net.load_state_dict(torch.load(resnet38_path), strict=False)
-    elif useresnest:
-        prefix = "resneSt"
-        resnest269_path = "weights/resnest269-0cc87c48.pth"
-        net = network.resnest269()
-        net.load_state_dict(torch.load(resnest269_path), strict=False)
     else:
         prefix = "scalenet"
         net = network.scalenet101(structure_path='network/structures/scalenet101.json', ckpt='weights/scalenet101.pth', num_class=num_class, adl_drop_rate=adl_drop_rate, adl_threshold=adl_threshold, regression_activate=activate_regression)
@@ -150,7 +136,7 @@ if __name__ == '__main__':
             transforms.Normalize(mean=mean, std=std)
         ])
 
-    # CUTMIX EXCLUSIVE
+    # CUTMIX CONFIGURATION
     if cutmix_alpha == 0:
         print("cutmix not enabled!")
         cutmix_fn = None
@@ -159,7 +145,7 @@ if __name__ == '__main__':
         cutmix_fn = Mixup(mixup_alpha=0, cutmix_alpha=cutmix_alpha,
                         cutmix_minmax=[0.4, 0.8], prob=1, switch_prob=0, 
                         mode="single", correct_lam=True, label_smoothing=0.0,
-                        num_classes=3)
+                        num_classes=num_class)
 
     # load training dataset
     TrainDataset = dataset.OriginPatchesDataset(data_path_name=f'Dataset_{target_dataset}/1.training/img', transform=train_transform, cutmix_fn=cutmix_fn, num_class=num_class)
@@ -169,7 +155,7 @@ if __name__ == '__main__':
 
     # optimizer and loss
     optimizer = PolyOptimizer(net.parameters(), base_lr, weight_decay=1e-4, max_step=epochs, momentum=0.9)
-    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean') # pos_weight=torch.tensor([0.73062968, 0.65306307, 2.11971588])
+    criteria = torch.nn.BCEWithLogitsLoss(reduction='mean')
     regression_criteria = torch.nn.MSELoss(reduction='mean').cuda()
     criteria.cuda()
 
@@ -230,18 +216,17 @@ if __name__ == '__main__':
             net_cam = torch.nn.DataParallel(net_cam, device_ids=devices).cuda()
 
             # calculate MIOU
-            valid_image_path = os.path.join(validation_cam_folder_name, model_name)
-            if target_dataset == 'wsss':
-                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name, epoch_i=i+1, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
-                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_wsss/2.validation/mask', num_workers=8, mask_path='Dataset_wsss/2.validation/background-mask', num_class=num_class)
-            elif target_dataset == 'warwick':
-                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
-                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_warwick/2.validation/mask', num_workers=8, num_class=num_class)
+            valid_image_path = os.path.join(validation_folder_name, model_name)
+            if target_dataset == 'luad':
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name, elimate_noise=True, label_path=f'groundtruth.json', majority_vote=False)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_luad/2.validation/mask', num_workers=8, mask_path='Dataset_luad/2.validation/background-mask', num_class=num_class)
+            elif target_dataset == 'glas':
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name)
+                valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_glas/2.validation/mask', num_workers=8, num_class=num_class)
             elif target_dataset == 'crag':
-                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
+                generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_folder_name, model_name)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
             iou_v.append(valid_iou)
-            # torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + f"_{i+1}.pth")
             
             if valid_iou > best_val:
                 print("Updating the best model..........................................")
@@ -260,7 +245,7 @@ if __name__ == '__main__':
     plt.savefig('./result/train_loss.png')
     plt.close()
 
-    plt.figure(3)
+    plt.figure(2)
     plt.plot(iou_v)
     plt.ylabel('accuracy')
     plt.xlabel('epochs')
