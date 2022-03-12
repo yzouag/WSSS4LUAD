@@ -97,11 +97,11 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
             crop_mask = mask[position[0]:position[0]+side_length, position[1]:position[1]+side_length]
             has_tumor = 0
             has_normal = 0
-            if np.sum(crop_mask > 0) / crop_mask.size > 0.05:
+            if np.sum(crop_mask > 0) / crop_mask.size > 0.05: # 实际上0是normal， 1是tumor， 基于dataset提供的gt
                 has_tumor = 1
             if np.sum(crop_mask == 0) / crop_mask.size > 0.05:
                 has_normal = 1
-            Image.fromarray(crop_im).resize((network_image_size, network_image_size)).save(os.path.join(destination, f'train_{i}_{j}-[{has_tumor}, {has_normal}].png'))
+            Image.fromarray(crop_im).save(os.path.join(destination, f'train_{i}_{j}-[{has_tumor}, {has_normal}].png'))
             summary.append((has_tumor, has_normal))
     
     print(Counter(summary))
@@ -116,33 +116,33 @@ def prepare_warwick(side_length: int, stride: int, network_image_size: int) -> N
         os.mkdir(validation_cam_folder_name)
 
     print('crop validation set images ...')
-    crop_validation_images(validation_dataset_path, network_image_size, int(network_image_size//3), scales, validation_cam_folder_name)
+    crop_validation_images(validation_dataset_path, network_image_size, network_image_size, scales, validation_cam_folder_name)
     print('cropping finishes!')
 
-    def process_mask(mask_folder_path, destination):
-        for mask_name in os.listdir(mask_folder_path):
-            mask = np.asarray(Image.open(os.path.join(mask_folder_path, mask_name))).copy()
-            # this three steps, convert tumor to 0, background to 2
-            mask[mask > 0] = 3
-            mask[mask == 0] = 1
-            mask[mask == 3] = 0
-            palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
-            with open(os.path.join(destination, f'{mask_name.split(".")[0]}.png'), 'wb') as f:
-                w = png.Writer(mask.shape[1], mask.shape[0],palette=palette, bitdepth=8)
-                w.write(f, mask.astype(np.uint8))
+    # def process_mask(mask_folder_path, destination):
+    #     for mask_name in os.listdir(mask_folder_path):
+    #         mask = np.asarray(Image.open(os.path.join(mask_folder_path, mask_name))).copy()
+    #         # this three steps, convert tumor to 0, background to 2
+    #         mask[mask > 0] = 3
+    #         mask[mask == 0] = 1
+    #         mask[mask == 3] = 0
+    #         palette = [(0, 64, 128), (64, 128, 0), (243, 152, 0), (255, 255, 255)]
+    #         with open(os.path.join(destination, f'{mask_name.split(".")[0]}.png'), 'wb') as f:
+    #             w = png.Writer(mask.shape[1], mask.shape[0],palette=palette, bitdepth=8)
+    #             w.write(f, mask.astype(np.uint8))
 
-    validation_mask_path = 'Dataset_warwick/2.validation/origin_mask'
-    destination = 'Dataset_warwick/2.validation/mask'
-    if not os.path.exists(destination):
-        os.mkdir(destination)
-    process_mask(validation_mask_path, destination)
+    # validation_mask_path = 'Dataset_warwick/2.validation/origin_mask'
+    # destination = 'Dataset_warwick/2.validation/mask'
+    # if not os.path.exists(destination):
+    #     os.mkdir(destination)
+    # process_mask(validation_mask_path, destination)
 
-    test_mask_path = 'Dataset_warwick/3.testing/origin_mask'
-    destination = 'Dataset_warwick/3.testing/mask'
-    if not os.path.exists(destination):
-        os.mkdir(destination)
-    process_mask(test_mask_path, destination)
-    print('mask processing finished!')
+    # test_mask_path = 'Dataset_warwick/3.testing/origin_mask'
+    # destination = 'Dataset_warwick/3.testing/mask'
+    # if not os.path.exists(destination):
+    #     os.mkdir(destination)
+    # process_mask(test_mask_path, destination)
+    # print('mask processing finished!')
 
 def prepare_crag(side_length: int, stride: int, network_image_size: int) -> None:
     """

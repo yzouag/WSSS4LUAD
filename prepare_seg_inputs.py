@@ -17,14 +17,12 @@ import yaml
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-batch', default=20, type=int)
-    parser.add_argument('-lr', default=0.01, type=float)
     parser.add_argument('-dataset', default='crag', type=str, choices=['warwick', 'wsss', 'crag'], help='now only support three types')
     parser.add_argument('-d','--device', nargs='+', help='GPU id to use parallel', required=True, type=int)
     parser.add_argument('-ckpt', type=str, help='the checkpoint model name')
     args = parser.parse_args()
 
     batch_size = args.batch
-    base_lr = args.lr
     target_dataset = args.dataset
     devices = args.device
     ckpt = args.ckpt
@@ -39,18 +37,20 @@ if __name__ == '__main__':
     network_image_size = data['network_image_size']
     scales = data['scales']
 
-    train_pseudo_mask_path = f'{ckpt}_train_pseudo_mask'
+    # train_pseudo_mask_path = f'{ckpt}_train_pseudo_mask'
+    train_pseudo_mask_path = f'{ckpt}_train_pseudo_mask_test'
     if not os.path.exists(train_pseudo_mask_path):
         os.mkdir(train_pseudo_mask_path)
 
-    train_dataset_path = f'Dataset_{target_dataset}/1.training/img'
+    # train_dataset_path = f'Dataset_{target_dataset}/1.training/img'
+    train_dataset_path = 'cropImage'
     majority_vote = False
     
     dataset = TrainingSetCAM(data_path_name=train_dataset_path, transform=transforms.Compose([
                         transforms.Resize((network_image_size, network_image_size)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=mean, std=std)
-                ]), patch_size=side_length, stride=stride, scales=scales, num_class=0
+                ]), patch_size=side_length, stride=stride, scales=scales, num_class=2
     )
     dataLoader = DataLoader(dataset, batch_size=1, drop_last=False)
 
@@ -67,10 +67,9 @@ if __name__ == '__main__':
     with torch.no_grad():
         for im_name, scaled_im_list, scaled_position_list, scales, big_label in tqdm(dataLoader):
             big_label = big_label[0]
-            eliminate_noise = True
-            if big_label.item()==0:
+            eliminate_noise = False
+            if len(big_label) == 1:
                 eliminate_noise = False
-            # exit()
             orig_img = np.asarray(Image.open(f'{train_dataset_path}/{im_name[0]}'))
             w, h, _ = orig_img.shape
 
@@ -120,7 +119,7 @@ if __name__ == '__main__':
                 if majority_vote:
                     if eliminate_noise:
                         for k in range(num_class):
-                            if big_label[k] == 0:
+                            if big_label[1-k] == 0:
                                 norm_cam[k, :, :] = -np.inf
                 
                     norm_cam = np.argmax(norm_cam, axis=0)        
@@ -134,15 +133,16 @@ if __name__ == '__main__':
             else:
                 if eliminate_noise:
                     for k in range(num_class):
-                        if big_label[k] == 0:
+                        if big_label[1-k] == 0:
                             ensemble_cam[k, :, :] = -np.inf
                             
                 result_label = ensemble_cam.argmax(axis=0)
             
+            if target_dataset == 'warwick':
+                np.save(f'{train_pseudo_mask_path}/{im_name[0].split(".")[0]}.npy', result_label)
+                continue
+            
             result_label = result_label + 1
             predicted_background_mask = predict_mask(Image.open(f'{train_dataset_path}/{im_name[0]}'), 230, 50)
             result_label = predicted_background_mask * result_label
-
-            if not os.path.exists(f'{train_pseudo_mask_path}'):
-                os.mkdir(f'{train_pseudo_mask_path}')
             np.save(f'{train_pseudo_mask_path}/{im_name[0].split(".")[0]}.npy', result_label)

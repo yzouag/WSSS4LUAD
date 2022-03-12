@@ -107,7 +107,7 @@ if __name__ == '__main__':
             generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
             valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
         
-        print(f"test mIOU score is: {valid_iou}")
+        print(f"test mIOU score is: {valid_iou:.4f}, Valid Dice: {2 * valid_iou / (1 + valid_iou):.4f}")
         exit()
 
     # EXCLUSIVELY FOR TRAINING
@@ -241,7 +241,7 @@ if __name__ == '__main__':
                 generate_validation_cam(net_cam, config, target_dataset, batch_size, validation_dataset_path, validation_cam_folder_name, model_name)
                 valid_iou = get_overall_valid_score(valid_image_path, 'Dataset_crag/2.validation/mask', num_workers=8, num_class=num_class)
             iou_v.append(valid_iou)
-            torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + f"_{i+1}.pth")
+            # torch.save({"model": net.state_dict(), 'optimizer': optimizer.state_dict()}, "./modelstates/" + prefix + "_" + model_name + f"_{i+1}.pth")
             
             if valid_iou > best_val:
                 print("Updating the best model..........................................")
