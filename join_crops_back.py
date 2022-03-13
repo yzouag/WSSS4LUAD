@@ -1,7 +1,7 @@
 import os
 from PIL import Image
 import numpy as np
-from utils.util import online_cut_patches
+from utils.pyutils import online_cut_patches
 import png
 
 # pseudo_mask_path = 'resnet_glas_11256_new_best_train_pseudo_mask'

@@ -11,7 +11,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 from dataset import TrainingSetCAM
 import network
-from utils.util import predict_mask
+from utils.pyutils import predict_mask
 import yaml
 
 if __name__ == '__main__':

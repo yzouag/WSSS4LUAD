@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import os
 import numpy as np
 from PIL import Image
-from utils.util import multiscale_online_crop
+from utils.pyutils import multiscale_online_crop
 from torchvision import transforms
 
 def get_file_label(filename, num_class=3):
@@ -15,7 +15,7 @@ def get_file_label(filename, num_class=3):
     return np.array(l)
 
 class OriginPatchesDataset(Dataset):
-    def __init__(self, data_path_name = "Dataset_wsss/1.training", transform=None, cutmix_fn=None, num_class=3):
+    def __init__(self, data_path_name = "Dataset_luad/1.training", transform=None, cutmix_fn=None, num_class=3):
         self.path = data_path_name
         self.files = os.listdir(data_path_name)
         self.transform = transform
@@ -33,7 +33,7 @@ class OriginPatchesDataset(Dataset):
         label = get_file_label(filename=self.files[idx], num_class=self.num_class)
         area = None
         if self.cutmix_fn and label.sum() == 1:
-            # This cutmix and area regression part is exclusively for the wsss dataset with three class
+            # This cutmix and area regression part is exclusively for the luad dataset with three class
             activate = np.random.randint(3)
             mixcategory = np.array((0, 0, 0))
             mixcategory[activate] = 1
@@ -60,22 +60,6 @@ class OriginPatchesDataset(Dataset):
             im = self.transform(im)
         
         return im, label, area
-
-class ValidationDataset(Dataset):
-    def __init__(self, data_path_name = "Dataset/2.validation/img", transform=None):
-        self.path = data_path_name
-        self.files = os.listdir(data_path_name)
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, idx):
-        image_path = os.path.join(self.path, self.files[idx])
-        im = Image.open(image_path)
-        if self.transform:
-            im = self.transform(im)
-        return im, self.files[idx]
 
 class OnlineDataset(Dataset):
     def __init__(self, data_path_name, transform, patch_size, stride, scales):
