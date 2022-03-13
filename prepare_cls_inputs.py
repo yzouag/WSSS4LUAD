@@ -8,6 +8,7 @@ from collections import Counter
 from utils.util import crop_validation_images
 import png
 import yaml
+import json
 
 def online_cut_patches(im, im_size, stride):
     """
@@ -67,7 +68,18 @@ def prepare_luad(side_length: int, stride: int, scales: List[int]) -> None:
     crop_validation_images(validation_dataset_path, side_length, stride, scales, validation_folder_name)
     print('cropping finishes!')
 
-    # TODO: generate groundtruth.json for validation images
+    mask_path = 'Dataset_luad/2.validation/mask'
+    groundtruth = {}
+    for im_name in os.listdir(mask_path):
+        im_path = os.path.join(mask_path, im_name)
+        mask = np.asarray(Image.open(im_path))
+        label = [0, 0, 0]
+        for i in range(3):
+            if i in mask:
+                label[i] = 1
+        groundtruth[im_name] = label
+    with open(os.path.join(validation_folder_name, 'groundtruth.json'), 'w') as outfile:
+        json.dump(groundtruth, outfile)
 
 def prepare_glas(side_length: int, stride: int, scales: List[int], network_image_size: int) -> None:
     """
