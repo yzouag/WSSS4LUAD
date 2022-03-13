@@ -24,6 +24,23 @@ def calculate_IOU(pred, real):
     num_cluster = len(np.unique(real))
     return score / num_cluster
 
+def calculate_F1(pred_path, gt_path):
+    TPs = 0
+    FPs = 0
+    FNs = 0
+    ims = os.listdir(pred_path)
+    for im in ims:
+        pred = np.asarray(Image.open(os.path.join(pred_path, im)))
+        gt = np.asarray(Image.open(os.path.join(gt_path, im)))
+        TP = np.sum(np.logical_and(pred == 0, gt == 0)) # 0 is glandular, 1 is non-glandular
+        FP = np.sum(np.logical_and(pred == 0, gt == 1))
+        FN = np.sum(np.logical_and(pred == 1, gt == 0))
+        TPs += TP
+        FPs += FP
+        FNs += FN    
+    f1_score = TPs / (TPs + (FPs + FNs)/2)
+    return f1_score
+
 
 def get_mIOU(mask, groundtruth, prediction):
     """
