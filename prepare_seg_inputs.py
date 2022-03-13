@@ -11,8 +11,9 @@ from tqdm import tqdm
 import torch.nn.functional as F
 from dataset import TrainingSetCAM
 import network
-from utils.pyutils import predict_mask
+from utils.pyutils import online_cut_patches, predict_mask
 import yaml
+import png
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -140,10 +141,50 @@ if __name__ == '__main__':
                             
                 result_label = ensemble_cam.argmax(axis=0)
             
+            # for luad dataset, we need to add the bg mask for later segmentation
+            # note now background is 0, tumor 1, stromal 2, normal 3
             if target_dataset == 'luad':
-                # for luad dataset, we need to add the bg mask for later segmentation
                 result_label = result_label + 1
                 predicted_background_mask = predict_mask(Image.open(f'{train_dataset_path}/{im_name[0]}'), 230, 50)
-                result_label = predicted_background_mask * result_label
+                result_label = predicted_background_mask * result_label            
             
             np.save(f'{train_pseudo_mask_path}/{im_name[0].split(".")[0]}.npy', result_label)
+
+    # for glas dataset, we need to merge cropped images back to original size
+    # since our segmentation model use different crop size
+    if target_dataset == 'glas':
+        partial_image_list = os.listdir(train_pseudo_mask_path)
+        origin_ims_path = 'Dataset_glas/2.validation/img'
+        
+        # make a dict to tract wich images are in a group and should be merged back
+        ims_dict = {}
+        for partial_mask in partial_image_list:
+            _, corresponding_im, index = partial_mask.split('_')
+            index = int(index.split('-')[0])
+            if f'{corresponding_im}.bmp' not in ims_dict:
+                ims_dict[f'{corresponding_im}.bmp'] = {}
+            ims_dict[f'{corresponding_im}.bmp'][index] = os.path.join(train_pseudo_mask_path, partial_mask)
+
+        # merge images to the size in validation set part
+        for origin_im in os.listdir(origin_ims_path):
+            im = np.asarray(Image.open(os.path.join(origin_ims_path, origin_im)))
+            complete_mask = np.zeros((im.shape[0], im.shape[1]))
+            sum_counter = np.zeros_like(complete_mask)
+            _, position_list = online_cut_patches(im, im_size=side_length, stride=stride)
+            
+            for i in range(len(position_list)):
+                partial_mask = np.load(ims_dict[origin_im][i], allow_pickle=True)
+                position = position_list[i]
+                complete_mask[position[0]:position[0]+side_length, position[1]:position[1]+side_length] += partial_mask
+                sum_counter[position[0]:position[0]+side_length, position[1]:position[1]+side_length] += 1
+
+            complete_mask = np.rint(complete_mask / sum_counter)
+            palette = [(0, 64, 128), (243, 152, 0)]
+            with open(os.path.join(train_pseudo_mask_path, f'{origin_im.split(".")[0]}.png'), 'wb') as f:
+                w = png.Writer(complete_mask.shape[1], complete_mask.shape[0], palette=palette, bitdepth=8)
+                w.write(f, complete_mask.astype(np.uint8))
+
+        # remove the cropped mask and only keep the complete mask
+        for partial_image in partial_image_list:
+            if os.path.exists(os.path.join(train_pseudo_mask_path, partial_image)):
+                os.remove(os.path.join(train_pseudo_mask_path, partial_image))
