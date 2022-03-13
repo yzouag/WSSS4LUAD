@@ -9,6 +9,7 @@ import cv2
 import copy
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
+import png
 
 def online_cut_patches(im, im_size, stride):
     """
@@ -210,3 +211,53 @@ def get_dataset_stats(dataset_root_path):
     
     print("normMean = {}".format(means))
     print("normStd = {}".format(stdevs))
+
+def glas_join_crops_back(cropped_cam_path: str, origin_ims_path: str, side_length: int, stride: int, is_train: bool) -> None:
+    """
+    merge the cropped image mask to the original image size and save in the `cropped_cam_path` folder
+
+    Args:
+        cropped_cam_path (str): the predicted crop masks path
+        origin_ims_path (str): the original image path
+        side_length (int): the crop size
+        stride (int): the step between crop images
+        is_train 
+    """
+    partial_image_list = os.listdir(cropped_cam_path)
+    # make a dict to tract wich images are in a group and should be merged back
+    ims_dict = {}
+    for partial_mask in partial_image_list:
+        _, corresponding_im, index = partial_mask.split('_')
+        index = int(index.split('-')[0])
+        if is_train:
+            if f'train_{corresponding_im}.bmp' not in ims_dict:
+                ims_dict[f'train_{corresponding_im}.bmp'] = {}
+            ims_dict[f'train_{corresponding_im}.bmp'][index] = os.path.join(cropped_cam_path, partial_mask)
+        else:
+            if f'{corresponding_im}.bmp' not in ims_dict:
+                ims_dict[f'{corresponding_im}.bmp'] = {}
+            ims_dict[f'{corresponding_im}.bmp'][index] = os.path.join(cropped_cam_path, partial_mask)
+
+    # merge images to the size in validation set part
+    for origin_im in os.listdir(origin_ims_path):
+        im = np.asarray(Image.open(os.path.join(origin_ims_path, origin_im)))
+        complete_mask = np.zeros((im.shape[0], im.shape[1]))
+        sum_counter = np.zeros_like(complete_mask)
+        _, position_list = online_cut_patches(im, im_size=side_length, stride=stride)
+
+        for i in range(len(position_list)):
+            partial_mask = np.load(ims_dict[origin_im][i], allow_pickle=True)
+            position = position_list[i]
+            complete_mask[position[0]:position[0]+side_length, position[1]:position[1]+side_length] += partial_mask
+            sum_counter[position[0]:position[0]+side_length, position[1]:position[1]+side_length] += 1
+
+        complete_mask = np.rint(complete_mask / sum_counter)
+        palette = [(0, 64, 128), (243, 152, 0)]
+        with open(os.path.join(cropped_cam_path, f'{origin_im.split(".")[0]}.png'), 'wb') as f:
+            w = png.Writer(complete_mask.shape[1], complete_mask.shape[0], palette=palette, bitdepth=8)
+            w.write(f, complete_mask.astype(np.uint8))
+
+    # remove the cropped mask and only keep the complete mask
+    for partial_image in partial_image_list:
+        if os.path.exists(os.path.join(cropped_cam_path, partial_image)):
+            os.remove(os.path.join(cropped_cam_path, partial_image))

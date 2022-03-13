@@ -24,7 +24,17 @@ def calculate_IOU(pred, real):
     num_cluster = len(np.unique(real))
     return score / num_cluster
 
-def calculate_F1(pred_path, gt_path):
+def calculate_F1(pred_path: str, gt_path: str) -> int:
+    """
+    get the F1 score in average by all images
+
+    Args:
+        pred_path (string): the prediction of masks to be tested
+        gt_path (string): the groundtruth mask file path
+
+    Returns:
+        int: F1 score
+    """
     TPs = 0
     FPs = 0
     FNs = 0
