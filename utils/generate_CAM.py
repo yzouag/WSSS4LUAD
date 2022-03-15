@@ -1,3 +1,4 @@
+import json
 from PIL import Image
 from tqdm import tqdm
 from torchvision import transforms
@@ -6,139 +7,118 @@ import numpy as np
 from torch.utils.data import DataLoader
 import dataset
 import torch
-from math import inf
 import os
-import shutil
-import json
+from scipy.stats import mode
 
-# IMPORTANT! Note we DO NOT use the norm in all cases.
 
-def generate_cam(net, model_name, model_crop, batch_size, mode, resize):
+def generate_validation_cam(net, config, target_dataset, batch_size, dataset_path, validation_folder_name, model_name, elimate_noise=False, label_path=None, majority_vote=False):
     """
-    generate the class activation map using the model pass into
+    Generate the class activation map for the validation set and evaluate.
 
     Args:
-        net (torch.models): the classification model
-        model_name (string): the name to store in ensemble_candidate
-        model_crop (tuple): (side_length, stride)
+        net (torch.model): the classification model
+        config (dict): configs from configuration.yml
+        target_dataset (str): current dataset name (glas, luad, crag)
         batch_size (int): batch to process the cam
-        mode (string): three options, 'train', 'valid', 'test'
+        dataset_path (str): the address of the image dataset
+        folder_name (str): the folder to store the cam output
+        model_name (str): the name for this cam_output model
+        elimate_noise (bool, optional): use image-level label to cancel some of the noise. Defaults to False.
+        label_path (str, optional): if `eliminate_noise` is True, input the labels path. Defaults to None.
+        majority_vote (bool, optional): use the majortity vote strategy for model ensemble. Defaults to False, then we simply add the cams from different scales together and do one argmax operation at last.
     """
-    out_path = 'train_pseudomask'
-    
-    if not os.path.exists(out_path):
-        os.mkdir(out_path)
-    else:
-        shutil.rmtree(out_path)
-        os.mkdir(out_path)
+    side_length = config['network_image_size']
+    mean = config[target_dataset]['mean']
+    std = config[target_dataset]['std']
+    num_class = config[target_dataset]['num_class']
+    network_image_size = config['network_image_size']
+    scales = config['scales']
+
     net.cuda()
     net.eval()
 
-    side_length, stride = model_crop
+    crop_image_path = f'{validation_folder_name}/crop_images/'
+    image_name_list = os.listdir(crop_image_path)
+    extension_name = os.listdir(dataset_path)[0].split('.')[-1]
+    
+    for image_name in tqdm(image_name_list):
+        orig_img = np.asarray(Image.open(f'{dataset_path}/{image_name}.{extension_name}'))
+        w, h, _ = orig_img.shape
+        if majority_vote:
+            ensemble_cam = []
+        else:
+            ensemble_cam = np.zeros((num_class, w, h))
+        
+        for scale in scales:
+            image_per_scale_path = crop_image_path + image_name + '/' + str(scale)
+            scale = float(scale)
+            offlineDataset = dataset.OfflineDataset(image_per_scale_path, transform=transforms.Compose([
+                    transforms.Resize((network_image_size, network_image_size)),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=mean, std=std)
+                ])
+            )
+            offlineDataloader = DataLoader(offlineDataset, batch_size=batch_size, drop_last=False)
 
-    if mode == 'train':
-        dataset_path = 'Dataset/1.training'
-    elif mode == 'valid':
-        dataset_path = 'Dataset/2.validation/img'
-    else:
-        dataset_path = 'Dataset/3.testing/img'
-
-    onlineDataset = dataset.OnlineDataset(dataset_path, 
-        transform=transforms.Compose([
-            transforms.Resize((resize,resize)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ]),
-        patch_size=side_length,
-        stride=stride
-    )
-
-    print("Dataset", len(onlineDataset))
-    onlineDataloader = DataLoader(onlineDataset, batch_size=1, drop_last=False)
-
-    with torch.no_grad():
-        for im_path, im_list, position_list in tqdm(onlineDataloader):
-            orig_img = np.asarray(Image.open(im_path[0]))
+            w_ = int(w*scale)
+            h_ = int(h*scale)
             interpolatex = side_length
             interpolatey = side_length
-            if orig_img.shape[0] < side_length:
-                interpolatex = orig_img.shape[0]
-            if orig_img.shape[1] < side_length:
-                interpolatey = orig_img.shape[1]
+            if w_ < side_length:
+                interpolatex = w_
+            if h_ < side_length:
+                interpolatey = h_
 
-            im_list = torch.vstack(im_list)
-
-            im_list = torch.split(im_list, batch_size)
-            cam_list = []
-            for ims in im_list:
-                cam_scores = net(ims.cuda())
-                cam_scores = F.interpolate(cam_scores, (interpolatex, interpolatey), mode='bilinear', align_corners=False).detach().cpu().numpy()
-                cam_list.append(cam_scores)
-            cam_list = np.concatenate(cam_list)
-
-            sum_cam = np.zeros((3, orig_img.shape[0], orig_img.shape[1]))
-            sum_counter = np.zeros_like(sum_cam)
-            
-            for k in range(cam_list.shape[0]):
-                y, x = position_list[k][0], position_list[k][1]
-                crop = cam_list[k]
-                sum_cam[:, y:y+side_length, x:x+side_length] += crop
-                sum_counter[:, y:y+side_length, x:x+side_length] += 1
-            sum_counter[sum_counter < 1] = 1
-
-            norm_cam = sum_cam / sum_counter
-            # cam_max = np.max(sum_cam, (1, 2), keepdims=True)
-            # cam_min = np.min(sum_cam, (1, 2), keepdims=True)
-            # sum_cam[sum_cam < cam_min+1e-5] = 0
-            # norm_cam = (sum_cam-cam_min) / (cam_max - cam_min + 1e-5)
-
-            if mode == 'train':
-                big_label = np.array([int(im_path[0][-12]), int(im_path[0][-9]), int(im_path[0][-6])])
-                for k in range(3):
-                    if big_label[k] == 0:
-                        norm_cam[k, :, :] = -inf
-
-                result_label = np.argmax(norm_cam, axis=0).astype(np.uint8)
-
-                if not os.path.exists('ensemble_candidates'):
-                    os.mkdir('ensemble_candidates')
-
-                if not os.path.exists(f'ensemble_candidates/{model_name}_cam'):
-                    os.mkdir(f'ensemble_candidates/{model_name}_cam')
+            with torch.no_grad():
+                cam_list = []
+                position_list = []
+                for ims, positions in offlineDataloader:
+                    cam_scores = net(ims.cuda())
+                    cam_scores = F.interpolate(cam_scores, (interpolatex, interpolatey), mode='bilinear', align_corners=False).detach().cpu().numpy()
+                    cam_list.append(cam_scores)
+                    position_list.append(positions.numpy())
+                cam_list = np.concatenate(cam_list)
+                position_list = np.concatenate(position_list)
+                sum_cam = np.zeros((num_class, w_, h_))
+                sum_counter = np.zeros_like(sum_cam)
                 
-                resultpath = im_path[0].split('/')[-1].split('.')[0]
-                # np.save(f'ensemble_candidates/{model_name}_cam/{resultpath}.npy', norm_cam)
-                np.save(f'{out_path}/{resultpath}.npy', result_label)
+                for k in range(cam_list.shape[0]):
+                    y, x = position_list[k][0], position_list[k][1]
+                    crop = cam_list[k]
+                    sum_cam[:, y:y+side_length, x:x+side_length] += crop
+                    sum_counter[:, y:y+side_length, x:x+side_length] += 1
+                sum_counter[sum_counter < 1] = 1
+                norm_cam = sum_cam / sum_counter
+                norm_cam = F.interpolate(torch.unsqueeze(torch.tensor(norm_cam),0), (w, h), mode='bilinear', align_corners=False).detach().cpu().numpy()[0]
 
-            if mode == 'valid':         
-                with open('groundtruth.json') as f:
+                # Use the image-level label to eliminate impossible pixel classes
+                if majority_vote:
+                    if elimate_noise:
+                        with open(f'{validation_folder_name}/{label_path}') as f:
+                            big_labels = json.load(f)
+                        big_label = big_labels[f'{image_name}.png']        
+                        for k in range(num_class):
+                            if big_label[k] == 0:
+                                norm_cam[k, :, :] = -np.inf
+                
+                    norm_cam = np.argmax(norm_cam, axis=0)        
+                    ensemble_cam.append(norm_cam)
+                else:
+                    ensemble_cam += norm_cam                
+        
+        if majority_vote:
+            ensemble_cam = np.stack(ensemble_cam, axis=0)
+            result_label = mode(ensemble_cam, axis=0)[0]
+        else:
+            if elimate_noise:
+                with open(f'{validation_folder_name}/{label_path}') as f:
                     big_labels = json.load(f)
-                big_label = big_labels[im_path[0][-6:]]
-                
-                for k in range(3):
+                big_label = big_labels[f'{image_name}.png']        
+                for k in range(num_class):
                     if big_label[k] == 0:
-                        norm_cam[k, :, :] = -inf
-                result_label = norm_cam.argmax(axis=0)
-
-                if not os.path.exists('valid_out_cam'):
-                    os.mkdir('valid_out_cam')
-
-                # if not os.path.exists(f'out_cam/{model_name}_cam_nonorm'):
-                #     os.mkdir(f'out_cam/{model_name}_cam_nonorm')
-                # np.save(f'out_cam/{model_name}_cam_nonorm/{im_path[0][-6:-4]}.npy', norm_cam)
-
-                if not os.path.exists(f'valid_out_cam/{model_name}'):
-                    os.mkdir(f'valid_out_cam/{model_name}')
-                np.save(f'valid_out_cam/{model_name}/{im_path[0][-6:-4]}.npy', result_label)
-
-            if mode == 'test':
-                result_label = norm_cam.argmax(axis=0)
-
-                folder = 'test_candidates'
-                if not os.path.exists(folder):
-                    os.mkdir(folder)
-
-                if not os.path.exists(f'{folder}/{model_name}'):
-                    os.mkdir(f'{folder}/{model_name}')
-                np.save(f'{folder}/{model_name}/{im_path[0][-6:-4]}.npy', norm_cam)
-
+                        ensemble_cam[k, :, :] = -np.inf
+                        
+            result_label = ensemble_cam.argmax(axis=0)
+        if not os.path.exists(f'{validation_folder_name}/{model_name}'):
+            os.mkdir(f'{validation_folder_name}/{model_name}')
+        np.save(f'{validation_folder_name}/{model_name}/{image_name}.npy', result_label)

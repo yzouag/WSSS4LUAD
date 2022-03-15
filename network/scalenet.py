@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import json
 import math
 import numpy as np
+from network.adl import ADL
 
 class SABlock(nn.Module):
     layer_idx = 0
@@ -74,8 +75,15 @@ class SABlock(nn.Module):
 
 class ScaleNet(nn.Module):
 
-    def __init__(self, block, layers, structure, dilations=(1,1,2,4)):
+    def __init__(self, block, layers, structure, dilations=(1,1,2,4), num_class=3, adl_drop_rate=None, adl_threshold=None, regression_activate=False):
         super(ScaleNet, self).__init__()
+
+        # add attention dropout layers
+        self.adl_drop_rate = adl_drop_rate
+        self.adl_threshold = adl_threshold
+        self.regression_activate = regression_activate
+        if adl_drop_rate is not None:
+            self.adl = ADL(self.adl_drop_rate, self.adl_threshold)
 
         self.inplanes = 64
         self.structure = structure
@@ -96,10 +104,17 @@ class ScaleNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-        # self.normalize = Normalize()
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(2048, 128)
-        self.fc2 = nn.Linear(128, 3)
+        self.fc1 = nn.Linear(3584, num_class)
+        if self.regression_activate:
+            self.fcregression = nn.Linear(3584, num_class)
+            self.soft = nn.Softmax(dim=0)
+        # self.fc2 = nn.Linear(128, 3)
+        # self.f3_2 = torch.nn.Conv2d(512, 64, 1, bias=False)
+        # self.f3_3 = torch.nn.Conv2d(1024, 64, 1, bias=False)
+        # self.f3_4 = torch.nn.Conv2d(2048, 64, 1, bias=False)
+        # self.f4 = torch.nn.Conv2d(192, 192, 1, bias=False)
+
         self.not_training = []
         block.layer_idx = 0
 
@@ -121,18 +136,29 @@ class ScaleNet(nn.Module):
 
         x = F.max_pool2d(x, 3, 2, 1)
         x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
+        x2 = self.layer2(x)
+        x3 = self.layer3(x2)
+        if self.adl_drop_rate is not None:
+            x = self.adl(x)
+        x4 = self.layer4(x3)
+        # x3_2 = F.elu(self.f3_2(x2))
+        # x3_3 = F.elu(self.f3_2(x3))
+        # x3_4 = F.elu(self.f3_2(x4))
+        # x5 = F.elu(self.f4(torch.cat([x3_2, x3_3, x3_4], dim=1)))
+        x5 = torch.cat([x2, x3, x4], dim=1)
 
-        result = self.pool(x)
+        result = self.pool(x5)
         result = torch.flatten(result, start_dim=1)
-        result = self.fc1(result)
-        result =F.relu(result)
-        result = self.fc2(result)
+        classification_result = self.fc1(result)
 
-        return result
-        # return dict({'x2': x2, 'x3': x3, 'x4': x4})
+        if self.regression_activate:
+            regression_result = self.fcregression(result)
+            regression_result = self.soft(regression_result)
+            return classification_result, regression_result
+
+        return classification_result
 
     def train(self, mode=True):
 
@@ -170,10 +196,10 @@ def scalenet50(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
     return model
 
 
-def scalenet101(structure_path, ckpt=None, dilations=(1,1,1,1), **kwargs):
+def scalenet101(structure_path, ckpt=None, dilations=(1,1,1,1), num_class=3, adl_drop_rate=None, adl_threshold=None, regression_activate=False, **kwargs):
     layer = [3, 4, 23, 3]
     structure = json.loads(open(structure_path).read())
-    model = ScaleNet(SABlock, layer, structure, dilations, **kwargs)
+    model = ScaleNet(SABlock, layer, structure, dilations, num_class, adl_drop_rate, adl_threshold, regression_activate, **kwargs)
 
     # pretrained
     if ckpt != None:
