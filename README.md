@@ -1,4 +1,7 @@
 # Weakly Supervised Learning for Whole Slide Image Segmentation
+## Introduction
+
+This is a Final Year Project of HKUST CSE department down by Yiduo Yu, Yiwen Zou, Tianqi Xiang and guided by PHD candidate Yi Li and professor Xiaomeng Li. Here is the project website: [Grand Challenge Website](https://wsss4luad.grand-challenge.org/WSSS4LUAD/).
 ## baseline
 https://arxiv.org/pdf/2110.08048.pdf
 
@@ -14,64 +17,20 @@ Now we are testing our model on three different dataset, they are:
 ├─network # backbone models
 │  └─structures # scalenet structures
 ├─result # images and logs for experiment results
+├─weights # pretrained model weights
 ├─utils # directory for helper functions
 │  ├─metric.py # F1 score, mIOU, Dice
-│  ├─util.py # most helper functions located
-│  └─generate_cam.py # extract features in image and generate the main
-├─prepare_cls_inputs.py # prepare the dataset for CAM model (crop images, adjust validation gt)
-├─prepare_seg_inputs.py # generate intermediate results (train image CAM)
+│  ├─pyutils.py # most helper functions located
+│  ├─mixup.py # cutmix function
+│  ├─torchutils.py # pytorch helper functions
+│  ├─post_processing.py # post processing file
+│  └─generate_CAM.py # cam generation file
+├─prepare_cls_inputs.py # preprocess images for classification model (crop images, adjust validation gt)
+├─prepare_seg_inputs.py # generate intermediate pseudo-mask labels
 ├─dataset.py # definition of Dataset and Dataloader
-└─main.py # train for CAM phase
+└─main.py # train for a classification model to generate CAM
 ```
 
-## model design
+The model pretrained weights could be downloaded from [Scalenet101 weights](https://pan.baidu.com/share/init?surl=NOjFWzkAVmMNkZh6jIcMzA) with extract code: f1c5 and [Resnet38 weights](https://onedrive.live.com/?authkey=%21ACgB0g238YxuTxs&id=B9423297729DF909%21106&cid=B9423297729DF909), all weights should be put under the `weights` folder.
 
-### 1.backbone [`network/wide_resnet_cam.py`, `network/scalenet_cam.py`]
-1.  add wide resnet-38 for fair comparision (verify the next modifications based on it, and apply scalenet after all settings are ready)
-
-2.  multi-scale feature map fusion (concat layer2, layer3, layer4 before fc)
-
-### 2.training settings: [`train.py`]
-
-**require modification!**
-
-#### classification
-
-- resolution of the patches is 224 × 224
-- batch size is set to 20
-- training epochs is set to 36
-- data augmentation: random resized scale (0.5, 1), cutmix (working), rand_augment(?)
-- learning rate of 1e − 2 with a polynomial decay policy
-
-#### segmentation phase
-
-- training epochs 20 
-- learning rate 7e − 2
-- no restriction of the image resolution
-- data augmentation: horizontal and vertical flip, Gaussian blur and normalization
-
-### 3.dataloader: [`dataset.py` (TrainSet, TestSet) ]
-
-1. train dataset: use original pathes without further sub crop (**Effective, Done**)
-2. train crop: add random resized crop (scale set to (0.5,1), defualt is (0.08, 1)) (**Done**)
-3. train augmentation: random augmentation for pathology (?)
-4. multi-scale test dataset: online crop for test, resize for multiple times firstly (eg, 0.5, 0.75, 1, 1.5, 2), then crop each reiszed image with stride (crop size same to train crop size) (**Effective, Done**)
-
-### 4.test and eval: [`test.py`, `eval.py`]
-1. test with multi-scale test (**Done**)
-2. use x^y for the normal channel (1 - pos.max()) to control the foreground activation scale, and then apply argmax to get psuedo-mask, for the value of y, use grid search based on validation gt (**Not Required, No need distinguishing foreground**)
-
-### 5.improvements: (`train.py`)
-1. norm: mean=[0.678,0.505,0.735] std=[0.144,0.208,0.174] (**Effective, Done**)
-2. large model: resnest269 (**Not effective, Done**)
-3. label balance: use a possitive weight in BCE loss (eg: pos_w = (neg_number / pos_number) ^ 0.5) (**Not effective, Done**)
-4. data synthesis: 4.1 original cutmix in batch; 4.2 cutmix based on label distribution (mainly stroma and tumor); 4.3 cutmix to balance different labels; 4.4 mosaic mix (eg.32x32x64 in seg, 56x56x16 cls, make sure 7 mixed types are balanced) (**Not effective, Done**)
-5. generate pseudo mask without model for single label patches (require corrosion and smoothing ) (**Done**)
-6. activation drop out: randomly drop high activation (**Not effective, Done**)
-7. area regression loss for single label patches / mixed patches in clssification (top2 loss_area) (**Not effective, Done**)
-8. diff loss weights for single-label / multi-label / mixed label (**Not effective, Done**)
-9. contrastive loss (reduce cosine distance for same category and enlarge it for the different, top2 loss_conl) (**In progress**)
-10. post-process (**In Progress**)
-    1. drop catogory whose area < 5% in subpatch pseudo-mask generation (top3)
-    2. after bg mask, use knn to indentify small area pixels (top1)
-    3. rm small tumer and stroma in normal (top1)
+**Now the repository only contains the first classification stage model. The segmentation model will be incorporated from another repo very soon.**
