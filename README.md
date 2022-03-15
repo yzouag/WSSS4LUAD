@@ -7,9 +7,9 @@ https://arxiv.org/pdf/2110.08048.pdf
 
 ## data
 Now we are testing our model on three different dataset, they are:
-- [https://wsss4luad.grand-challenge.org/WSSS4LUAD/](WSSS4LUAD)
-- [https://warwick.ac.uk/fac/cross_fac/tia/data/glascontest/](GlaS (Gland Segmentation in Colon Histology Images Challenge))
-- [https://warwick.ac.uk/fac/cross_fac/tia/data/mildnet/](Colorectal Adenocarcinoma Gland (CRAG) Dataset)
+- [WSSS4LUAD](https://wsss4luad.grand-challenge.org/WSSS4LUAD/)
+- [GlaS (Gland Segmentation in Colon Histology Images Challenge)](https://warwick.ac.uk/fac/cross_fac/tia/data/glascontest/)
+- [Colorectal Adenocarcinoma Gland(CRAG) Dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/mildnet/)
 
 ## project structure
 
