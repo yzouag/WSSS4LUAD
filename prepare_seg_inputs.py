@@ -41,10 +41,13 @@ if __name__ == '__main__':
     if not os.path.exists(train_pseudo_mask_path):
         os.mkdir(train_pseudo_mask_path)
 
-    train_dataset_path = f'Dataset_{target_dataset}/1.training/img'
+    if target_dataset == 'luad':
+        data_path_name = f'Dataset_{target_dataset}/1.training'
+    else:
+        data_path_name = f'Dataset_{target_dataset}/1.training/img'
     majority_vote = False
     
-    dataset = TrainingSetCAM(data_path_name=train_dataset_path, transform=transforms.Compose([
+    dataset = TrainingSetCAM(data_path_name=data_path_name, transform=transforms.Compose([
                         transforms.Resize((network_image_size, network_image_size)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=mean, std=std)
@@ -71,7 +74,7 @@ if __name__ == '__main__':
             if len(big_label) == 1:
                 eliminate_noise = False
             
-            orig_img = np.asarray(Image.open(f'{train_dataset_path}/{im_name[0]}'))
+            orig_img = np.asarray(Image.open(f'{data_path_name}/{im_name[0]}'))
             w, h, _ = orig_img.shape
 
             if majority_vote:
@@ -144,7 +147,7 @@ if __name__ == '__main__':
             # note now background is 0, tumor 1, stromal 2, normal 3
             if target_dataset == 'luad':
                 result_label = result_label + 1
-                predicted_background_mask = predict_mask(Image.open(f'{train_dataset_path}/{im_name[0]}'), 230, 50)
+                predicted_background_mask = predict_mask(Image.open(f'{data_path_name}/{im_name[0]}'), 230, 50)
                 result_label = predicted_background_mask * result_label            
             
             np.save(f'{train_pseudo_mask_path}/{im_name[0].split(".")[0]}.npy', result_label)

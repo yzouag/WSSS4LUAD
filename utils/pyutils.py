@@ -159,7 +159,7 @@ def predict_mask(image, threshold, minimal_size):
         np.ndarray: the predicted mask, same shape as `image`, 0 is background, 1 is foreground 
     """
     # threshold
-    image_t = np.asarray(image)
+    image_t = np.array(image)
     temp = cv2.cvtColor(image_t, cv2.COLOR_RGB2HSV)
     threshold_saturation = threshold_otsu(temp[:,:,1])
     image_t[temp[:,:,1] < threshold_saturation] = [255, 255, 255]

@@ -148,7 +148,11 @@ if __name__ == '__main__':
                         num_classes=num_class)
 
     # load training dataset
-    TrainDataset = dataset.OriginPatchesDataset(data_path_name=f'Dataset_{target_dataset}/1.training/img', transform=train_transform, cutmix_fn=cutmix_fn, num_class=num_class)
+    if target_dataset == 'luad':
+        data_path_name = f'Dataset_{target_dataset}/1.training'
+    else:
+        data_path_name = f'Dataset_{target_dataset}/1.training/img'
+    TrainDataset = dataset.OriginPatchesDataset(data_path_name=data_path_name, transform=train_transform, cutmix_fn=cutmix_fn, num_class=num_class)
     print("train Dataset", len(TrainDataset))
     TrainDatasampler = torch.utils.data.RandomSampler(TrainDataset)
     TrainDataloader = DataLoader(TrainDataset, batch_size=batch_size, num_workers=4, sampler=TrainDatasampler, drop_last=True)
